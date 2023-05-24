@@ -3,19 +3,18 @@ version: '3.8'
 services:
   dyplom_project:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
-    ports:
-      - "8000:8000"
+    command: gunicorn netology_pg_diplom.wsgi:application --bind 0.0.0.0:8000
+    expose:
+      - 8000
     networks:
       - automation
     depends_on:
       - db
+#    entrypoint: ["/usr/src/product_automation/entrypoint.sh"]
 
   db:
     image: postgres
     hostname: db
-    ports:
-      - "5433:5432"
     restart: always
     environment:
       - POSTRES_USER=$DB_USER
@@ -23,6 +22,17 @@ services:
       - POSTGRES_DB=$DB_NAME
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+    networks:
+      - automation
+
+  nginx:
+    build: ./nginx
+    ports:
+      - 80:80
+    depends_on:
+      - dyplom_project
+    volumes:
+      - ./static:/static
     networks:
       - automation
 
