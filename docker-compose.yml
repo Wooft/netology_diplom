@@ -28,7 +28,7 @@ services:
   nginx:
     build: ./nginx
     ports:
-      - 80:80
+      - 6060:80
     depends_on:
       - dyplom_project
     volumes:

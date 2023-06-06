@@ -16,7 +16,17 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from rest_framework.routers import DefaultRouter
+
+from backend.views import CategoryViewSet, ShopViewSet, YamlUploadView
+
+r = DefaultRouter()
+r.register('cat', CategoryViewSet)
+
+shop_router = DefaultRouter()
+shop_router.register('shop', ShopViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-]
+    path('yamlupload/', YamlUploadView.as_view())
+] + r.urls + shop_router.urls

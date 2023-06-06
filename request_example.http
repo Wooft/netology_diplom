@@ -1,0 +1,39 @@
+@baseUrl = http://127.0.0.1:8000
+
+###
+POST {{baseUrl}}/shop/
+Content-Type: application/json
+
+{
+    "name": "ТехноВидео",
+    "url": "http://tv.ru",
+    "filename": "Blabla",
+    "state": "True"
+}
+###
+GET {{baseUrl}}/shop/
+
+###
+POST {{baseUrl}}/cat/ 
+Content-Type: application/json
+
+{
+    "shops": [{
+    "name": "ТехноВидео",
+    "url": "http://q21231we.ru",
+    "filename": "Blabla",
+    "state": "True"
+}],
+    "name":"Смартфоны"
+}
+
+###
+GET {{baseUrl}}/cat
+
+###
+POST {{baseUrl}}/yaml/
+Content-Type: application/yaml
+
+{
+    "file": "/example.yaml"
+}
