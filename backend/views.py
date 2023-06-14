@@ -2,11 +2,23 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from backend.models import Shop, Category, Product, Productinfo, Parameter, ProductParameter
-from django.contrib.auth.models import User
-from backend.serializers import Shopserializer, CategorySerializer
+from backend.serializers import Shopserializer, CategorySerializer, ProductInfoSerializer
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from rest_framework.permissions import IsAuthenticated
 import yaml
 from yaml.loader import SafeLoader
 import re
+
+class ExampleView(APIView):
+    authentication_classes = [SessionAuthentication, BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        content = {
+            'user': str(request.user),
+            'auth': str(request.auth)
+        }
+        return Response(content)
 
 class ShopViewSet(ModelViewSet):
     queryset = Shop.objects.all()
@@ -16,9 +28,10 @@ class CategoryViewSet(ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
-class UserViewSet(ModelViewSet):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+
+class ProductInfoViewSet(ModelViewSet):
+    queryset = Productinfo.objects.all()
+    serializer_class = ProductInfoSerializer
 
 #Вьюха для загрузки информации из Yaml файла
 class YamlUploadView(APIView):

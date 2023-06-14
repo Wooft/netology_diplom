@@ -1,10 +1,54 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser, User
+from django.contrib.auth.models import AbstractUser, User, BaseUserManager
 
 USER_TYPE_CHOICES = (
     ('shop', 'магазин'),
     ('buyer', 'покупатель')
 )
+
+class UserManager(BaseUserManager):
+    use_in_migrations = True
+    def _create_user(self, email, password, **extra_fields):
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_user(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_superuser', False)
+        return self._create_user(email, password, **extra_fields)
+
+    def create_superuser(self, email, password, **extra_fields):
+        extra_fields.setdefault('is_superuser', True)
+
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser!!!!')
+
+        return self._create_user(email, password, **extra_fields)
+
+
+class User(AbstractUser):
+
+    REQUIRED_FIELDS = ['username',]
+    USERNAME_FIELD = 'email'
+
+    objects = UserManager
+
+    lastname = models.CharField(verbose_name='Фамилия', max_length=50, blank=False)
+    name = models.CharField(verbose_name='Имя' ,max_length=50, blank=False)
+    username = models.CharField(verbose_name='Никнейм', max_length=50, blank=False, null=False)
+    surname = models.CharField(verbose_name='Отчество', max_length=50, blank=False, null=False)
+    email = models.EmailField(unique=True, null=False)
+    company = models.CharField(max_length=100, blank=True, null=True)
+    position = models.CharField(max_length=100, null=True, blank=True)
+    type = models.CharField(verbose_name='Тип пользователя', choices=USER_TYPE_CHOICES, max_length=5, default='buyer', blank=False, null=False)
+
+    class Meta:
+        verbose_name = 'Пользователь'
+        verbose_name_plural = 'Пользователи'
+        ordering = ('email', )
+
 
 #Модель, содержащая дополнительное свойство "Тип пользователя", чтобы определять тип учетной записи (покупатель или продавец)
 class Person(models.Model):

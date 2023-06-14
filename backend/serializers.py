@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from backend.models import Shop, Product, Category
+from backend.models import Shop, Product, Category, Productinfo
 from django.contrib.auth.models import User
 
 class Shopserializer(serializers.ModelSerializer):
@@ -16,8 +16,15 @@ class CategorySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         print(validated_data)
 
-
-class UserSerializer(serializers.ModelSerializer):
+class ProductSerializer(serializers.ModelSerializer):
     class Meta:
-        model = User
-        fields = ['',]
+        model = Product
+        fields = ['model', 'category']
+
+class ProductInfoSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(many=False, read_only=True)
+    shop = Shopserializer(many=False, read_only=True)
+
+    class Meta:
+        model = Productinfo
+        fields = ['product', 'shop', 'name', 'quantity', 'price']
