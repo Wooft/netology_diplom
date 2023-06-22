@@ -17,16 +17,21 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from rest_framework.authtoken.views import obtain_auth_token
 
-from backend.views import CategoryViewSet, ShopViewSet, YamlUploadView, ProductInfoViewSet, ExampleView
+from backend.views import CategoryViewSet, ShopViewSet, YamlUploadView, ProductInfoViewSet, RegisterUser, \
+    ShoppingCartViewSet
 
 r = DefaultRouter()
 r.register('cat', CategoryViewSet)
 r.register('shop', ShopViewSet)
 r.register('products', ProductInfoViewSet)
+r.register('shopping_cart', ShoppingCartViewSet)
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('yamlupload/', YamlUploadView.as_view()),
+    #Путь для сессионной авторизации
     path('auth/', include('rest_framework.urls')),
-    path('get_rrc', ExampleView.as_view())
+    path('get_token/', obtain_auth_token),
+    path('register/', RegisterUser.as_view())
 ] + r.urls

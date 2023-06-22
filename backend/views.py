@@ -1,24 +1,18 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
-from backend.models import Shop, Category, Product, Productinfo, Parameter, ProductParameter
-from backend.serializers import Shopserializer, CategorySerializer, ProductInfoSerializer
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.viewsets import ModelViewSet, ViewSet
+from backend.models import Shop, Category, Product, Productinfo, Parameter, ProductParameter, CustomUser, Order, \
+    Orderitem
+from backend.serializers import Shopserializer, CategorySerializer, ProductInfoSerializer, CustomUserSerializer, \
+    OrderSerializer, OrderitemSerizlizer
+from django.contrib.auth.hashers import make_password
+from rest_framework import status
 import yaml
 from yaml.loader import SafeLoader
 import re
-
-class ExampleView(APIView):
-    authentication_classes = [SessionAuthentication, BasicAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        content = {
-            'user': str(request.user),
-            'auth': str(request.auth)
-        }
-        return Response(content)
+from rest_framework.permissions import IsAuthenticated
+from django.db.utils import IntegrityError
+from django.forms.models import model_to_dict
 
 class ShopViewSet(ModelViewSet):
     queryset = Shop.objects.all()
@@ -28,11 +22,85 @@ class CategoryViewSet(ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
+#Вьюха для работы корзины. На вход принимает запрос с Applicetion/data в формате JSON, содержащий ключи:
+# product - id продукта, добавляемого в корзину
+# shop - id магазина, в котором выбирается продукт
+# quantity - количество единиц добавляемого продукта
+class ShoppingCartViewSet(ModelViewSet):
+    queryset = Orderitem.objects.all()
+    serializer_class = OrderitemSerizlizer
+    permission_classes = [IsAuthenticated, ]
+    http_method_names = ["get", "post", "delete"]
+
+    #Получение информации о текущей корзине
+    #Доступна только зарегистрированным пользователям
+    def list(self, request, *args, **kwargs):
+        #Получение заказа со статусом "в корзине". Если в базе данных несколько таких заказов, то получает последний созданный
+        basket = Order.objects.filter(user=request.user, status="in_shoppingcart").order_by("-dt")
+        #Если заказа со статусом "в корзине" нет в базе данных - выдается статус что корзина пуста
+        if len(basket) == 0:
+            return Response({"status": "shoppingcart is empty"},
+                            status=status.HTTP_200_OK)
+        else:
+            qs = Orderitem.objects.filter(order=basket[0])
+        return Response(self.serializer_class(qs, many=True).data,status=status.HTTP_200_OK)
+
+    #Заполнение корзины, создание заказа со статусом (в корзине)
+    def create(self, request, *args, **kwargs):
+        #Проверка на то, что в БД есть заказ со статусом "в корзине"
+        if Order.objects.filter(user=request.user, status="in_shoppingcart").exists():
+            #Если да, то он добавляется в request.data"
+            request.data["order"] = Order.objects.filter(user=request.user, status="in_shoppingcart")[0].id
+            #Проверка на наличие Orderitem в базе данных
+            if Orderitem.objects.filter(order=request.data["order"], product=request.data["product"], shop=request.data["shop"]).exists():
+                instance = Orderitem.objects.filter(order=request.data["order"], product=request.data["product"])[0]
+                request.data["quantity"] = request.data["quantity"] + instance.quantity
+                serializer = self.get_serializer(instance, data=request.data)
+                serializer.is_valid(raise_exception=True)
+                self.perform_update(serializer)
+                return Response(serializer.data)
+            else:
+                serializer = self.serializer_class(data=request.data)
+                if serializer.is_valid(raise_exception=True):
+                    serializer.save()
+                    return Response(serializer.data, status=status.HTTP_200_OK)
+        else:
+            request.data['order'] = Order.objects.create(user=request.user, status="in_shoppingcart").id
+            serializer = self.serializer_class(data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+# Функция, которая очищает корзину
+    def delete(self, request):
+        #Проверка наличия заказа или нескольких заказов, соответсвующих пользователю, со статусом "в корзине"
+        if Order.objects.filter(user=request.user, status="in_shoppingcart").exists():
+            #Заказы сохраняются в список
+            basket = Order.objects.filter(user=request.user, status="in_shoppingcart")
+            #Для каждого заказа из списка
+            for element in basket:
+                #Получается список позиций Orderitems
+                items = Orderitem.objects.filter(order=element)
+                for item in items:
+                    #Каждая позиция в списке удаляется
+                    item.delete()
+                #Затем удаляется заказ со статусом "В корзине"
+                element.delete()
+            return Response({"status": "shoppingcart empty"},
+                            status=status.HTTP_200_OK)
+        #Если заказа со статусом "в корзине" не существует, пользователь получает сообщение что корзина пуста
+        else:
+            return Response({"status": "shoppingcart is already empty"},
+                            status=status.HTTP_200_OK)
+
+
+class OrdersView(ViewSet):
+    queryset = Order.objects.all()
+    serializer_class = OrderSerializer
 
 class ProductInfoViewSet(ModelViewSet):
     queryset = Productinfo.objects.all()
     serializer_class = ProductInfoSerializer
-
+    http_method_names = ['post', ]
 #Вьюха для загрузки информации из Yaml файла
 class YamlUploadView(APIView):
     #Обрабатывает метод POST
@@ -41,12 +109,12 @@ class YamlUploadView(APIView):
         #Выброс ошибки, если отсуствует файл
         if request.FILES.get('file') == None:
             return Response(
-                {'status': 'please load correct yaml file'}, status='400'
+                {'status': 'please load correct yaml file'}, status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
             )
         #Проверка на соответствие типа файла. Если это не yanl - выбрасывается ошибка
         elif re.search(pattern=pattern, string=request.FILES['file'].name)[0] != '.yaml':
             return Response(
-                {'status': 'Please load file in "yaml" format'}, status='400'
+                {'status': 'Please load file in "yaml" format'}, status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
             )
         else:
             #прием YAML файла
@@ -89,3 +157,19 @@ class YamlUploadView(APIView):
             return Response({
                 'status': 'ok'
             })
+
+class RegisterUser(APIView):
+    def post(self, request):
+        #проверка того, что введенные пароли совпадают
+        if request.data['password'] != request.data['repeatpassword']:
+            return Response({
+                'status': "password don't match"
+            },status=400)
+        else:
+            #Если пароль введен верно, то он хэшируется перед добавлением в базу данных
+            request.data['password'] = make_password(request.data['password'])
+            request.data.pop('repeatpassword')
+        serializer = CustomUserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, User, BaseUserManager
+from django.contrib.auth.hashers import make_password
 
 USER_TYPE_CHOICES = (
     ('shop', 'магазин'),
@@ -11,7 +12,7 @@ class UserManager(BaseUserManager):
     def _create_user(self, email, password, **extra_fields):
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
-        user.set_password(password)
+        user.set_password(raw_password=make_password(password))
         user.save(using=self._db)
         return user
 
@@ -28,21 +29,19 @@ class UserManager(BaseUserManager):
         return self._create_user(email, password, **extra_fields)
 
 
-class User(AbstractUser):
+class CustomUser(AbstractUser):
 
     REQUIRED_FIELDS = ['username',]
     USERNAME_FIELD = 'email'
 
-    objects = UserManager
+    objects = UserManager()
 
-    lastname = models.CharField(verbose_name='Фамилия', max_length=50, blank=False)
-    name = models.CharField(verbose_name='Имя' ,max_length=50, blank=False)
-    username = models.CharField(verbose_name='Никнейм', max_length=50, blank=False, null=False)
-    surname = models.CharField(verbose_name='Отчество', max_length=50, blank=False, null=False)
+    surname = models.CharField(verbose_name='Отчество', max_length=50, blank=True, null=True)
     email = models.EmailField(unique=True, null=False)
     company = models.CharField(max_length=100, blank=True, null=True)
     position = models.CharField(max_length=100, null=True, blank=True)
-    type = models.CharField(verbose_name='Тип пользователя', choices=USER_TYPE_CHOICES, max_length=5, default='buyer', blank=False, null=False)
+    type = models.CharField(verbose_name='Тип пользователя', choices=USER_TYPE_CHOICES, max_length=5, default='buyer', blank=False, null=False)\
+
 
     class Meta:
         verbose_name = 'Пользователь'
@@ -50,22 +49,16 @@ class User(AbstractUser):
         ordering = ('email', )
 
 
-#Модель, содержащая дополнительное свойство "Тип пользователя", чтобы определять тип учетной записи (покупатель или продавец)
-class Person(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    type = models.CharField(verbose_name='Тип пользователя',
-                            max_length=5,
-                            choices=USER_TYPE_CHOICES,
-                            default='buyer')
-
 #Модель заказа, содержит информацию о дате создания и статусе заказа
 class Order(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    dt = models.DateTimeField(verbose_name='Создан',
-                              auto_created=True)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    dt = models.DateTimeField(verbose_name="Создан",
+                              auto_now_add=True)
     status = models.CharField(verbose_name='Статус заказа',
                               max_length=15)
 
+    def __str__(self):
+        return f'Заказ №{self.id}'
 
 class Shop(models.Model):
     name = models.CharField(verbose_name='Название магазина',
@@ -74,7 +67,8 @@ class Shop(models.Model):
                             blank=False)
     url = models.URLField(verbose_name='Ссылка на сайт магазина',
                           max_length=40,
-                          unique=True)
+                          unique=True,
+                          blank=True)
     filename = models.CharField(verbose_name='Файл',
                                 max_length=20)
     state = models.BooleanField(default=True)
@@ -97,12 +91,12 @@ class Product(models.Model):
         return f'{self.model}'
 
 
-# class Orderitem(models.Model):
-#     order = models.ForeignKey(Order, on_delete=models.CASCADE)
-#     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-#     shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
-#     quantity = models.PositiveIntegerField()
-#
+class Orderitem(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+
 class Productinfo(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     shop = models.ForeignKey(Shop, on_delete=models.SET_NULL, null=True)
