@@ -173,3 +173,13 @@ class RegisterUser(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+class ConfirmOrderViewset(ModelViewSet):
+    queryset = Order.objects.all()
+    serializer_class = OrderSerializer
+
+    def list(self, request, *args, **kwargs):
+        pass
+
+    def create(self, request, *args, **kwargs):
+        pass

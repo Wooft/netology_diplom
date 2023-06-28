@@ -115,3 +115,25 @@ class ProductParameter(models.Model):
     product_info = models.ForeignKey(Productinfo, on_delete=models.CASCADE)
     parameter = models.ForeignKey(Parameter, on_delete=models.CASCADE)
     value = models.CharField()
+
+#Модель для сохранения адреса пользователя
+class Adress(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    city = models.CharField(max_length=50, verbose_name="Город", blank=False, null=False)
+    street = models.CharField(max_length=150, verbose_name="Улица", blank=False, null=False)
+    home = models.PositiveIntegerField(verbose_name="Дом", blank=False, null=False)
+    structure = models.CharField(max_length=10, verbose_name="Корпус")
+    building = models.CharField(max_length=10, verbose_name="Строение")
+    apartment = models.CharField(max_length=10, verbose_name="Квартира / Офис")
+
+    def __str__(self):
+        return f"Город: {self.city}, улица: {self.street}, дом {self.home}"
+
+#Модель для сохранения контактного лица в заказе
+class Contact(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100, verbose_name="Имя", null=False)
+    last_name = models.CharField(max_length=150, verbose_name="Фамилия")
+    surname = models.CharField(max_length=150, verbose_name="Отчество")
+    email = models.EmailField(verbose_name="Email")
+    phone = models.CharField(max_length=12, verbose_name="Номер телефона", null=False)
