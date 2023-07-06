@@ -20,14 +20,15 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken.views import obtain_auth_token
 
 from backend.views import CategoryViewSet, ShopViewSet, YamlUploadView, ProductInfoViewSet, RegisterUser, \
-    ShoppingCartViewSet, ConfirmOrderViewset
+    ShoppingCartViewSet, ConfirmOrderViewset, OrderViewSet
 
 r = DefaultRouter()
 r.register('cat', CategoryViewSet)
 r.register('shop', ShopViewSet)
 r.register('products', ProductInfoViewSet)
 r.register('shopping_cart', ShoppingCartViewSet)
-r.register('confirm_order', ConfirmOrderViewset)
+r.register("confirm_order", ConfirmOrderViewset)
+r.register('orders', OrderViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),

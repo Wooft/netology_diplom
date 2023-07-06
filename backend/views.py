@@ -2,17 +2,17 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ViewSet
 from backend.models import Shop, Category, Product, Productinfo, Parameter, ProductParameter, CustomUser, Order, \
-    Orderitem
+    Orderitem, Contact
+from backend.permissions import IsOwner
 from backend.serializers import Shopserializer, CategorySerializer, ProductInfoSerializer, CustomUserSerializer, \
-    OrderSerializer, OrderitemSerizlizer
+    OrderSerializer, ContactSerializer, ArdressSerializer, OrderitemGetSerizlizer, \
+    OrderItemCreateSerializer, ProductSerializer
 from django.contrib.auth.hashers import make_password
 from rest_framework import status
 import yaml
 from yaml.loader import SafeLoader
 import re
 from rest_framework.permissions import IsAuthenticated
-from django.db.utils import IntegrityError
-from django.forms.models import model_to_dict
 
 class ShopViewSet(ModelViewSet):
     queryset = Shop.objects.all()
@@ -28,15 +28,16 @@ class CategoryViewSet(ModelViewSet):
 # quantity - количество единиц добавляемого продукта
 class ShoppingCartViewSet(ModelViewSet):
     queryset = Orderitem.objects.all()
-    serializer_class = OrderitemSerizlizer
-    permission_classes = [IsAuthenticated, ]
+    #В serializer_class находится сериалайзер, который отвечает за вывод иноформации
+    serializer_class = OrderitemGetSerizlizer
+    permission_classes = [IsAuthenticated, IsOwner]
     http_method_names = ["get", "post", "delete"]
 
     #Получение информации о текущей корзине
     #Доступна только зарегистрированным пользователям
     def list(self, request, *args, **kwargs):
         #Получение заказа со статусом "в корзине". Если в базе данных несколько таких заказов, то получает последний созданный
-        basket = Order.objects.filter(user=request.user, status="in_shoppingcart").order_by("-dt")
+        basket = Order.objects.filter(user=request.user, status="basket").order_by("-dt")
         #Если заказа со статусом "в корзине" нет в базе данных - выдается статус что корзина пуста
         if len(basket) == 0:
             return Response({"status": "shoppingcart is empty"},
@@ -48,34 +49,36 @@ class ShoppingCartViewSet(ModelViewSet):
     #Заполнение корзины, создание заказа со статусом (в корзине)
     def create(self, request, *args, **kwargs):
         #Проверка на то, что в БД есть заказ со статусом "в корзине"
-        if Order.objects.filter(user=request.user, status="in_shoppingcart").exists():
+        if Order.objects.filter(user=request.user, status="basket").exists():
             #Если да, то он добавляется в request.data"
-            request.data["order"] = Order.objects.filter(user=request.user, status="in_shoppingcart")[0].id
+            request.data["order"] = Order.objects.filter(user=request.user, status="basket")[0].id
             #Проверка на наличие Orderitem в базе данных
             if Orderitem.objects.filter(order=request.data["order"], product=request.data["product"], shop=request.data["shop"]).exists():
                 instance = Orderitem.objects.filter(order=request.data["order"], product=request.data["product"])[0]
                 request.data["quantity"] = request.data["quantity"] + instance.quantity
-                serializer = self.get_serializer(instance, data=request.data)
+                #Для создания новых объектов корзины используется OrderItemCreateSerializer, который принимает для создания PK Shop, Product, Order
+                serializer = OrderItemCreateSerializer(instance, data=request.data)
                 serializer.is_valid(raise_exception=True)
                 self.perform_update(serializer)
                 return Response(serializer.data)
             else:
-                serializer = self.serializer_class(data=request.data)
+                serializer = OrderItemCreateSerializer(data=request.data)
                 if serializer.is_valid(raise_exception=True):
                     serializer.save()
                     return Response(serializer.data, status=status.HTTP_200_OK)
         else:
-            request.data['order'] = Order.objects.create(user=request.user, status="in_shoppingcart").id
-            serializer = self.serializer_class(data=request.data)
+            #Если такого заказа нет, то создается новая корзина и заполняется указанным товаром
+            request.data['order'] = Order.objects.create(user=request.user, status="basket").id
+            serializer = OrderItemCreateSerializer(data=request.data)
             if serializer.is_valid(raise_exception=True):
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
 # Функция, которая очищает корзину
     def delete(self, request):
         #Проверка наличия заказа или нескольких заказов, соответсвующих пользователю, со статусом "в корзине"
-        if Order.objects.filter(user=request.user, status="in_shoppingcart").exists():
+        if Order.objects.filter(user=request.user, status="basket").exists():
             #Заказы сохраняются в список
-            basket = Order.objects.filter(user=request.user, status="in_shoppingcart")
+            basket = Order.objects.filter(user=request.user, status="basket")
             #Для каждого заказа из списка
             for element in basket:
                 #Получается список позиций Orderitems
@@ -85,17 +88,12 @@ class ShoppingCartViewSet(ModelViewSet):
                     item.delete()
                 #Затем удаляется заказ со статусом "В корзине"
                 element.delete()
-            return Response({"status": "shoppingcart empty"},
+            return Response({"status": "Корзина очищена"},
                             status=status.HTTP_200_OK)
         #Если заказа со статусом "в корзине" не существует, пользователь получает сообщение что корзина пуста
         else:
-            return Response({"status": "shoppingcart is already empty"},
+            return Response({"status": "Корзина уже пуста"},
                             status=status.HTTP_200_OK)
-
-
-class OrdersView(ViewSet):
-    queryset = Order.objects.all()
-    serializer_class = OrderSerializer
 
 class ProductInfoViewSet(ModelViewSet):
     queryset = Productinfo.objects.all()
@@ -134,9 +132,11 @@ class YamlUploadView(APIView):
                 newcat[0].shops.add(newshop[0])
             #создание нового продукта
             for product in filetoload['goods']:
+                category = Category.objects.get(id=product['category'])
                 newproduct = Product.objects.get_or_create(model=product['model'],
-                                                           category=newcat[0])
+                                                           category=category)
                 new_info=Productinfo.objects.get_or_create(
+                    id=product['id'],
                     product=newproduct[0],
                     shop=newshop[0],
                     name=product['name'],
@@ -172,14 +172,74 @@ class RegisterUser(APIView):
         serializer = CustomUserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 class ConfirmOrderViewset(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
+    http_method_names = ["post", "get"]
 
-    def list(self, request, *args, **kwargs):
-        pass
+    #Используется для формы "спасибо за заказ"
+    def retrieve(self, request, *args, **kwargs):
+        order = self.get_object()
+        #Тут возвращается номер заказа
+        #Тут возвращаются детали заказа
+        positions = OrderitemGetSerizlizer(Orderitem.objects.filter(order=order), many=True)
+        #Тут возвращаются детали получаетля
+        contacts = ContactSerializer(Contact.objects.get(order=order))
+        print(contacts)
+        return Response({"order_number": order.id,
+                         "details": positions.data,
+                         "contacts": contacts.data})
 
     def create(self, request, *args, **kwargs):
-        pass
+        order = Order.objects.get(id=request.data["contact"]["order"])
+        if order.status == 'new':
+            request.data["adress"]["order"] = order.id
+            contact = ContactSerializer(data=request.data["contact"])
+            adress = ArdressSerializer(data=request.data["adress"])
+            if contact.is_valid(raise_exception=True) and adress.is_valid(raise_exception=True):
+                order.status = "confirmed"
+                contact.save()
+                adress.save()
+                order.save()
+                return Response({"status": "all_valid", f"Заказ №{order.id}": f"{order.status}"},
+                                status=status.HTTP_201_CREATED)
+
+        else:
+            return Response({"status": "Заказ уже оформлен"},status=status.HTTP_404_NOT_FOUND)
+
+
+class OrderViewSet(ModelViewSet):
+    queryset = Order.objects.all()
+    serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated, IsOwner]
+    http_method_names = ['get', ]
+
+    #Метод list возвращает список заказов пользователя, за исключением заказов со статусом "в корзине"
+    def list(self, request, *args, **kwargs):
+        orders = Order.objects.filter(user=request.user).exclude(status='basket')
+        seriazlizer = self.serializer_class(orders, many=True)
+        for order in seriazlizer.data:
+            sum = 0
+            for item in order['items']:
+                sum += Orderitem.objects.get(id=item).product.price * Orderitem.objects.get(id=item).quantity
+            order.pop('items')
+            #В заказ включается поле "сумма"
+            order['summ'] = sum
+        return Response(seriazlizer.data, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, *args, **kwargs):
+        data = self.serializer_class(self.get_object()).data
+        templist = []
+        for element in data['items']:
+            item = OrderitemGetSerizlizer(Orderitem.objects.get(id=element)).data
+            item['summ'] = float(item['product']['price']) * item['quantity']
+            templist.append(item)
+        data['items'] = templist
+        data['contact'] = ContactSerializer(Contact.objects.get(order=data['id'])).data
+        data['adress'] = ArdressSerializer(self.get_object().adress.get()).data
+        return Response(data, status=status.HTTP_200_OK)
+
+

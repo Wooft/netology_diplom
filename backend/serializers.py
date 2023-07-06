@@ -1,9 +1,10 @@
 from rest_framework import serializers
-from backend.models import Shop, Product, Category, Productinfo, CustomUser, Order, Orderitem
+from backend.models import Shop, Product, Category, Productinfo, CustomUser, Order, Orderitem, Contact, Adress
 from rest_framework.exceptions import ValidationError
 
 
 class Shopserializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False)
     class Meta:
         model = Shop
         fields = "__all__"
@@ -21,29 +22,44 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = ['model', 'category']
 
 class ProductInfoSerializer(serializers.ModelSerializer):
-    product = ProductSerializer(many=True, read_only=True)
-    shop = Shopserializer(many=True, read_only=True)
 
     class Meta:
         model = Productinfo
-        fields = ['product', 'shop', 'name', 'quantity', 'price']
-
+        fields = ['name', 'price']
 class CustomUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
         fields = ["first_name", "last_name", "username", "surname", "email", "company", "position", "type", "password"]
 
-class OrderSerializer(serializers.ModelSerializer):
 
-    class Meta:
-        model = Order
-        fields = ["id", "dt", "status"]
-
-class OrderitemSerizlizer(serializers.ModelSerializer):
-    # order = OrderSerializer(many=False, read_only=False)
-    # product = ProductSerializer(many=False, read_only=True)
-    # shop = Shopserializer(many=False, read_only=True)
+class OrderitemGetSerizlizer(serializers.ModelSerializer):
+    product = ProductInfoSerializer(many=False, read_only=True)
+    shop = Shopserializer(many=False, read_only=True)
     class Meta:
         model = Orderitem
-        fields = ["id", "order", "product", "shop", "quantity"]
+        fields = ("id", "order", "product", "shop", "quantity")
+
+class OrderItemCreateSerializer(serializers.ModelSerializer):
+
+
+    class Meta:
+        model = Orderitem
+        fields = "__all__"
+
+class ArdressSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Adress
+        fields = '__all__'
+
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ["id", "dt", "status", "items"]
+
+class ContactSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Contact
+        fields = '__all__'

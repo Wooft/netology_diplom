@@ -7,12 +7,18 @@ USER_TYPE_CHOICES = (
     ('buyer', 'покупатель')
 )
 
+ORDER_STATE_CHOICES = (
+    ('basket', 'Корзина'),
+    ('new', 'новый'),
+    ('confirmed', 'Подтвержен')
+)
+
 class UserManager(BaseUserManager):
     use_in_migrations = True
     def _create_user(self, email, password, **extra_fields):
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
-        user.set_password(raw_password=make_password(password))
+        user.set_password(password)
         user.save(using=self._db)
         return user
 
@@ -22,6 +28,8 @@ class UserManager(BaseUserManager):
 
     def create_superuser(self, email, password, **extra_fields):
         extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_active', True)
 
         if extra_fields.get('is_superuser') is not True:
             raise ValueError('Superuser!!!!')
@@ -31,7 +39,7 @@ class UserManager(BaseUserManager):
 
 class CustomUser(AbstractUser):
 
-    REQUIRED_FIELDS = ['username',]
+    REQUIRED_FIELDS = ['username', ]
     USERNAME_FIELD = 'email'
 
     objects = UserManager()
@@ -84,21 +92,14 @@ class Category(models.Model):
         return f'{self.name}'
 
 class Product(models.Model):
-    model = models.CharField(verbose_name='Модель', max_length=50)
+    model = models.CharField(verbose_name='Модель', max_length=50, unique=True)
     category = models.ForeignKey(Category, verbose_name='Категории', on_delete=models.CASCADE)
 
     def __str__(self):
         return f'{self.model}'
 
-
-class Orderitem(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField()
-
 class Productinfo(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='info')
     shop = models.ForeignKey(Shop, on_delete=models.SET_NULL, null=True)
     name = models.CharField(verbose_name='Название', max_length=50)
     quantity = models.PositiveIntegerField(verbose_name='Количество')
@@ -109,6 +110,15 @@ class Productinfo(models.Model):
                                     decimal_places=2,
                                     max_digits=10)
 
+
+class Orderitem(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey(Productinfo, on_delete=models.CASCADE, related_name='product_in_order')
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+
+
+
 class Parameter(models.Model):
     name = models.CharField(verbose_name='Название', max_length=100, unique=True)
 class ProductParameter(models.Model):
@@ -118,13 +128,14 @@ class ProductParameter(models.Model):
 
 #Модель для сохранения адреса пользователя
 class Adress(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='adress')
     city = models.CharField(max_length=50, verbose_name="Город", blank=False, null=False)
     street = models.CharField(max_length=150, verbose_name="Улица", blank=False, null=False)
-    home = models.PositiveIntegerField(verbose_name="Дом", blank=False, null=False)
-    structure = models.CharField(max_length=10, verbose_name="Корпус")
-    building = models.CharField(max_length=10, verbose_name="Строение")
-    apartment = models.CharField(max_length=10, verbose_name="Квартира / Офис")
+    home = models.CharField(verbose_name="Дом", blank=False, null=False)
+    structure = models.CharField(max_length=10, verbose_name="Корпус", blank=True)
+    building = models.CharField(max_length=10, verbose_name="Строение", blank=True)
+    apartment = models.CharField(max_length=10, verbose_name="Квартира / Офис", blank=True)
+    is_save = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Город: {self.city}, улица: {self.street}, дом {self.home}"

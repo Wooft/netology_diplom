@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_rest_passwordreset',
     'rest_framework.authtoken',
+    'django_filters',
 ]
 
 MIDDLEWARE = [
@@ -89,9 +90,9 @@ DATABASES = {
     }
 }
 
-PASSWORD_HASHERS = [
-    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher'
-]
+# PASSWORD_HASHERS = [
+#     'django.contrib.auth.hashers.BCryptSHA256PasswordHasher'
+# ]
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -145,5 +146,8 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.BasicAuthentication',
         'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
     ]
 }
