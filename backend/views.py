@@ -60,7 +60,7 @@ class ShoppingCartViewSet(ModelViewSet):
                 serializer = OrderItemCreateSerializer(instance, data=request.data)
                 serializer.is_valid(raise_exception=True)
                 self.perform_update(serializer)
-                return Response(serializer.data)
+                return Response(serializer.data, status=status.HTTP_200_OK)
             else:
                 serializer = OrderItemCreateSerializer(data=request.data)
                 if serializer.is_valid(raise_exception=True):
@@ -98,7 +98,7 @@ class ShoppingCartViewSet(ModelViewSet):
 class ProductInfoViewSet(ModelViewSet):
     queryset = Productinfo.objects.all()
     serializer_class = ProductInfoSerializer
-    http_method_names = ['post', ]
+    http_method_names = ['post', 'get']
 #Вьюха для загрузки информации из Yaml файла
 class YamlUploadView(APIView):
     #Обрабатывает метод POST
@@ -160,19 +160,22 @@ class YamlUploadView(APIView):
 
 class RegisterUser(APIView):
     def post(self, request):
+        try:
         #проверка того, что введенные пароли совпадают
-        if request.data['password'] != request.data['repeatpassword']:
-            return Response({
-                'status': "password don't match"
-            },status=400)
-        else:
-            #Если пароль введен верно, то он хэшируется перед добавлением в базу данных
-            request.data['password'] = make_password(request.data['password'])
-            request.data.pop('repeatpassword')
-        serializer = CustomUserSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+            if request.data['password'] != request.data['repeatpassword']:
+                return Response({
+                    'status': "password don't match"
+                },status=400)
+            else:
+                #Если пароль введен верно, то он хэшируется перед добавлением в базу данных
+                request.data['password'] = make_password(request.data['password'])
+                request.data.pop('repeatpassword')
+            serializer = CustomUserSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except KeyError:
+            return Response(data={'status': 'input data incorrect'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class ConfirmOrderViewset(ModelViewSet):

@@ -100,7 +100,7 @@ class Product(models.Model):
 
 class Productinfo(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='info')
-    shop = models.ForeignKey(Shop, on_delete=models.SET_NULL, null=True)
+    shop = models.ForeignKey(Shop, on_delete=models.SET_NULL, null=True, related_name='product_info')
     name = models.CharField(verbose_name='Название', max_length=50)
     quantity = models.PositiveIntegerField(verbose_name='Количество')
     price = models.DecimalField(verbose_name='Цена',
