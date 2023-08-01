@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from backend.models import Shop, Product, Category, Productinfo, CustomUser, Order, Orderitem, Contact, Adress
+from backend.models import Shop, Product, Category, Productinfo, CustomUser, Order, Orderitem, Contact, Adress, \
+    Parameter, ProductParameter, Availability
 from rest_framework.exceptions import ValidationError
 
 
@@ -21,11 +22,30 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = ['model', 'category']
 
-class ProductInfoSerializer(serializers.ModelSerializer):
+class ParameterSerializer(serializers.ModelSerializer):
 
     class Meta:
+        model = Parameter
+        fields = ['name']
+
+class AvailableSerializer(serializers.ModelSerializer):
+    shop = Shopserializer(many=False)
+    class Meta:
+        model = Availability
+        fields = ['shop', 'price', 'quantity']
+
+class ProductParameterSerializer(serializers.ModelSerializer):
+    parameter = ParameterSerializer(many=False)
+    class Meta:
+        model = ProductParameter
+        fields = ['parameter', 'value']
+
+class ProductInfoSerializer(serializers.ModelSerializer):
+    availability = AvailableSerializer(many=True)
+    parameters = ProductParameterSerializer(many=True)
+    class Meta:
         model = Productinfo
-        fields = ['name', 'price']
+        fields = ['id', 'name', 'availability', 'parameters']
 class CustomUserSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -39,6 +59,14 @@ class OrderitemGetSerizlizer(serializers.ModelSerializer):
     class Meta:
         model = Orderitem
         fields = ("id", "order", "product", "shop", "quantity")
+        depth = 1
+
+class BasketSerializer(serializers.ModelSerializer):
+    product = ProductInfoSerializer(many=False, read_only=True)
+    shop = Shopserializer(many=False, read_only=True)
+    class Meta:
+        model = Orderitem
+        fields = ("product", "shop", "quantity")
 
 class OrderItemCreateSerializer(serializers.ModelSerializer):
 

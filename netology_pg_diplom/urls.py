@@ -14,19 +14,20 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+import debug_toolbar
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken.views import obtain_auth_token
 
 from backend.views import CategoryViewSet, ShopViewSet, YamlUploadView, ProductInfoViewSet, RegisterUser, \
-    ShoppingCartViewSet, ConfirmOrderViewset, OrderViewSet
+    BasketViewSet, ConfirmOrderViewset, OrderViewSet
 
 r = DefaultRouter()
 r.register('cat', CategoryViewSet)
 r.register('shop', ShopViewSet)
 r.register('products', ProductInfoViewSet)
-r.register('shopping_cart', ShoppingCartViewSet)
+r.register('basket', BasketViewSet)
 r.register("confirm_order", ConfirmOrderViewset)
 r.register('orders', OrderViewSet)
 
@@ -36,5 +37,6 @@ urlpatterns = [
     #Путь для сессионной авторизации
     path('auth/', include('rest_framework.urls')),
     path('get_token/', obtain_auth_token),
-    path('register/', RegisterUser.as_view())
+    path('register/', RegisterUser.as_view()),
+    path('__debug__/', include(debug_toolbar.urls)),
 ] + r.urls

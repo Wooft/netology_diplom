@@ -1,12 +1,14 @@
+import pprint
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ViewSet
 from backend.models import Shop, Category, Product, Productinfo, Parameter, ProductParameter, CustomUser, Order, \
-    Orderitem, Contact
+    Orderitem, Contact, Availability
 from backend.permissions import IsOwner
 from backend.serializers import Shopserializer, CategorySerializer, ProductInfoSerializer, CustomUserSerializer, \
     OrderSerializer, ContactSerializer, ArdressSerializer, OrderitemGetSerizlizer, \
-    OrderItemCreateSerializer, ProductSerializer
+    OrderItemCreateSerializer, ProductSerializer, BasketSerializer
 from django.contrib.auth.hashers import make_password
 from rest_framework import status
 import yaml
@@ -26,10 +28,10 @@ class CategoryViewSet(ModelViewSet):
 # product - id продукта, добавляемого в корзину
 # shop - id магазина, в котором выбирается продукт
 # quantity - количество единиц добавляемого продукта
-class ShoppingCartViewSet(ModelViewSet):
+class BasketViewSet(ModelViewSet):
     queryset = Orderitem.objects.all()
     #В serializer_class находится сериалайзер, который отвечает за вывод иноформации
-    serializer_class = OrderitemGetSerizlizer
+    serializer_class = BasketSerializer
     permission_classes = [IsAuthenticated, IsOwner]
     http_method_names = ["get", "post", "delete"]
 
@@ -43,8 +45,23 @@ class ShoppingCartViewSet(ModelViewSet):
             return Response({"status": "shoppingcart is empty"},
                             status=status.HTTP_200_OK)
         else:
+            summ = 0
+            delivery_price = 0
             qs = Orderitem.objects.filter(order=basket[0])
-        return Response(self.serializer_class(qs, many=True).data,status=status.HTTP_200_OK)
+            data = self.serializer_class(qs, many=True).data
+            for item in data:
+                for shop in item["product"]["availability"]:
+                    if shop["shop"]["id"] == item["shop"]["id"]:
+                        item["product"]["price"] = shop["price"]
+                        summ += float(shop["price"]) * float(item["quantity"])
+                item["product"].pop("availability")
+            total = delivery_price + summ
+            data.append({"summ": summ,
+                         "delivery_price": delivery_price,
+                         "total": total})
+
+
+        return Response(data, status=status.HTTP_200_OK)
 
     #Заполнение корзины, создание заказа со статусом (в корзине)
     def create(self, request, *args, **kwargs):
@@ -99,17 +116,19 @@ class ProductInfoViewSet(ModelViewSet):
     queryset = Productinfo.objects.all()
     serializer_class = ProductInfoSerializer
     http_method_names = ['post', 'get']
+
+
 #Вьюха для загрузки информации из Yaml файла
 class YamlUploadView(APIView):
     #Обрабатывает метод POST
     def post(self, request):
         pattern = '(\.[A-Za-z]*)'
-        #Выброс ошибки, если отсуствует файл
+        #Выброс ошибки, если отсуствует файл - вложение
         if request.FILES.get('file') == None:
             return Response(
                 {'status': 'please load correct yaml file'}, status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
             )
-        #Проверка на соответствие типа файла. Если это не yanl - выбрасывается ошибка
+        #Проверка на соответствие типа файла. Если это не yaml - выбрасывается ошибка
         elif re.search(pattern=pattern, string=request.FILES['file'].name)[0] != '.yaml':
             return Response(
                 {'status': 'Please load file in "yaml" format'}, status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
@@ -138,11 +157,14 @@ class YamlUploadView(APIView):
                 new_info=Productinfo.objects.get_or_create(
                     id=product['id'],
                     product=newproduct[0],
-                    shop=newshop[0],
                     name=product['name'],
-                    quantity=product['quantity'],
-                    price=product['price'],
                     price_rrc=product['price_rrc'],
+                )
+                set_price = Availability.objects.get_or_create(
+                    product_info=new_info[0],
+                    shop=newshop[0],
+                    price=product['price'],
+                    quantity=product['quantity']
                 )
                 #Создание параметров
                 for name, value in product['parameters'].items():

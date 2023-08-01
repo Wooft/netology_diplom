@@ -75,7 +75,6 @@ class Shop(models.Model):
                             blank=False)
     url = models.URLField(verbose_name='Ссылка на сайт магазина',
                           max_length=40,
-                          unique=True,
                           blank=True)
     filename = models.CharField(verbose_name='Файл',
                                 max_length=20)
@@ -100,12 +99,8 @@ class Product(models.Model):
 
 class Productinfo(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='info')
-    shop = models.ForeignKey(Shop, on_delete=models.SET_NULL, null=True, related_name='product_info')
+    shop = models.ManyToManyField(Shop, through='Availability')
     name = models.CharField(verbose_name='Название', max_length=50)
-    quantity = models.PositiveIntegerField(verbose_name='Количество')
-    price = models.DecimalField(verbose_name='Цена',
-                                decimal_places=2,
-                                max_digits=10)
     price_rrc = models.DecimalField(verbose_name='РРЦ',
                                     decimal_places=2,
                                     max_digits=10)
@@ -117,14 +112,18 @@ class Orderitem(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField()
 
-
-
 class Parameter(models.Model):
     name = models.CharField(verbose_name='Название', max_length=100, unique=True)
 class ProductParameter(models.Model):
-    product_info = models.ForeignKey(Productinfo, on_delete=models.CASCADE)
-    parameter = models.ForeignKey(Parameter, on_delete=models.CASCADE)
+    product_info = models.ForeignKey(Productinfo, on_delete=models.CASCADE, related_name='parameters')
+    parameter = models.ForeignKey(Parameter, on_delete=models.CASCADE, related_name='product_info')
     value = models.CharField()
+### Таблица "Наличие", через нее реализована связь многие-ко-многим таблиц "product_info" и "shop", сожержит информацию о актуальных ценах и наличии товара
+class Availability(models.Model):
+    product_info = models.ForeignKey(Productinfo, on_delete=models.CASCADE, related_name='availability')
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name='price')
+    price = models.DecimalField(verbose_name='Цена', decimal_places=2, max_digits=10)
+    quantity = models.PositiveIntegerField(verbose_name='Количество')
 
 #Модель для сохранения адреса пользователя
 class Adress(models.Model):

@@ -60,6 +60,8 @@ def test_shop_view():
     client = APIClient()
     response = client.get('/shop/')
     assert response.status_code == 200
+
+###mТестирование регистрации
 @pytest.mark.django_db
 def test_create_user(client):
     response = client.post('/register/', data= {
@@ -75,12 +77,14 @@ def test_create_user(client):
     })
     assert response.status_code == 201
     assert response.data['username'] == 'someusername1'
+
 #Проверка на отправку пустого запроса
 def test_fail_create_user(client):
     responce = client.post('/register/')
     assert responce.status_code == 400
     assert responce.data['status'] == 'input data incorrect'
 
+#Проверка неполной формы регистрации
 def test_register_incorrect_user(client):
     responce = client.post('/register/', data={
         'username': 'username'
@@ -138,6 +142,24 @@ def test_patch_basket(auth_client, product_info_factory):
 @pytest.mark.django_db
 def test_delete_basket(auth_client):
     response = auth_client.delete('/shopping_cart/')
-    print(response.data)
     assert response.status_code == 200
     assert response.data['status'] == 'Корзина уже пуста'
+
+###Тестирование получения списка товаров
+@pytest.mark.django_db
+def test_get_products(auth_client, product_info_factory):
+    products = product_info_factory(_quantity=10)
+    response = auth_client.get('/products/')
+    assert response.status_code == 200
+    for product in products:
+        assert product.name == auth_client.get(f'/products/{product.id}/').data['name']
+
+###Тестирование формы входа
+
+###Тестирование подтверждения заказа
+
+
+###Тестирование формы 'спасибо за заказ'
+
+
+###Тестирование заказа
