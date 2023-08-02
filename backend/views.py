@@ -1,5 +1,3 @@
-import pprint
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ViewSet
@@ -8,7 +6,7 @@ from backend.models import Shop, Category, Product, Productinfo, Parameter, Prod
 from backend.permissions import IsOwner
 from backend.serializers import Shopserializer, CategorySerializer, ProductInfoSerializer, CustomUserSerializer, \
     OrderSerializer, ContactSerializer, ArdressSerializer, OrderitemGetSerizlizer, \
-    OrderItemCreateSerializer, ProductSerializer, BasketSerializer
+    OrderItemCreateSerializer, BasketSerializer
 from django.contrib.auth.hashers import make_password
 from rest_framework import status
 import yaml
@@ -59,8 +57,6 @@ class BasketViewSet(ModelViewSet):
             data.append({"summ": summ,
                          "delivery_price": delivery_price,
                          "total": total})
-
-
         return Response(data, status=status.HTTP_200_OK)
 
     #Заполнение корзины, создание заказа со статусом (в корзине)
@@ -192,6 +188,9 @@ class RegisterUser(APIView):
                 #Если пароль введен верно, то он хэшируется перед добавлением в базу данных
                 request.data['password'] = make_password(request.data['password'])
                 request.data.pop('repeatpassword')
+                #Тип пользоватлея при создании - всегда покупатель, менять его могут админы. Из запроса информация удаляется.
+                if request.data.get('type') != None:
+                    request.data.pop('type')
             serializer = CustomUserSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             serializer.save()
@@ -199,6 +198,11 @@ class RegisterUser(APIView):
         except KeyError:
             return Response(data={'status': 'input data incorrect'}, status=status.HTTP_400_BAD_REQUEST)
 
+class AccountViewset(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        serializer = CustomUserSerializer(request.user)
+        return Response(serializer.data, status.HTTP_200_OK)
 
 class ConfirmOrderViewset(ModelViewSet):
     queryset = Order.objects.all()

@@ -21,7 +21,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken.views import obtain_auth_token
 
 from backend.views import CategoryViewSet, ShopViewSet, YamlUploadView, ProductInfoViewSet, RegisterUser, \
-    BasketViewSet, ConfirmOrderViewset, OrderViewSet
+    BasketViewSet, ConfirmOrderViewset, OrderViewSet, AccountViewset
 
 r = DefaultRouter()
 r.register('cat', CategoryViewSet)
@@ -39,4 +39,5 @@ urlpatterns = [
     path('get_token/', obtain_auth_token),
     path('register/', RegisterUser.as_view()),
     path('__debug__/', include(debug_toolbar.urls)),
+    path('myaccount/', AccountViewset.as_view())
 ] + r.urls

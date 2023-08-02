@@ -50,7 +50,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ["first_name", "last_name", "username", "surname", "email", "company", "position", "type", "password"]
+        fields = ["id", "first_name", "last_name", "username", "surname", "email", "company", "position", "type", "password"]
 
 
 class OrderitemGetSerizlizer(serializers.ModelSerializer):
