@@ -3,10 +3,10 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ViewSet
 from backend.models import Shop, Category, Product, Productinfo, Parameter, ProductParameter, CustomUser, Order, \
     Orderitem, Contact, Availability
-from backend.permissions import IsOwner
+from backend.permissions import BasketOwner
 from backend.serializers import Shopserializer, CategorySerializer, ProductInfoSerializer, CustomUserSerializer, \
     OrderSerializer, ContactSerializer, ArdressSerializer, OrderitemGetSerizlizer, \
-    OrderItemCreateSerializer, BasketSerializer
+    OrderItemCreateSerializer, BasketSerializer, ProducInfoForBuyerSerializer
 from django.contrib.auth.hashers import make_password
 from rest_framework import status
 import yaml
@@ -30,8 +30,8 @@ class BasketViewSet(ModelViewSet):
     queryset = Orderitem.objects.all()
     #В serializer_class находится сериалайзер, который отвечает за вывод иноформации
     serializer_class = BasketSerializer
-    permission_classes = [IsAuthenticated, IsOwner]
-    http_method_names = ["get", "post", "delete"]
+    permission_classes = [IsAuthenticated, BasketOwner]
+    http_method_names = ["get", "post", "delete", "patch"]
 
     #Получение информации о текущей корзине
     #Доступна только зарегистрированным пользователям
@@ -54,6 +54,9 @@ class BasketViewSet(ModelViewSet):
                         summ += float(shop["price"]) * float(item["quantity"])
                 item["product"].pop("availability")
             total = delivery_price + summ
+            if request.user.type != 'shop':
+               for elements in data:
+                   elements['product'].pop('price_rrc')
             data.append({"summ": summ,
                          "delivery_price": delivery_price,
                          "total": total})
@@ -61,31 +64,45 @@ class BasketViewSet(ModelViewSet):
 
     #Заполнение корзины, создание заказа со статусом (в корзине)
     def create(self, request, *args, **kwargs):
-        #Проверка на то, что в БД есть заказ со статусом "в корзине"
+        # Проверка на то, что в БД есть заказ со статусом "в корзине"
         if Order.objects.filter(user=request.user, status="basket").exists():
             #Если да, то он добавляется в request.data"
             request.data["order"] = Order.objects.filter(user=request.user, status="basket")[0].id
             #Проверка на наличие Orderitem в базе данных
             if Orderitem.objects.filter(order=request.data["order"], product=request.data["product"], shop=request.data["shop"]).exists():
-                instance = Orderitem.objects.filter(order=request.data["order"], product=request.data["product"])[0]
-                request.data["quantity"] = request.data["quantity"] + instance.quantity
-                #Для создания новых объектов корзины используется OrderItemCreateSerializer, который принимает для создания PK Shop, Product, Order
-                serializer = OrderItemCreateSerializer(instance, data=request.data)
-                serializer.is_valid(raise_exception=True)
-                self.perform_update(serializer)
-                return Response(serializer.data, status=status.HTTP_200_OK)
+                instance = Orderitem.objects.filter(order=request.data["order"], product=request.data["product"], shop=request.data["shop"])[0]
+                #Проверка того что в указанном магазине находится достаточное количество товара в наличии
+                request.data["quantity"] = int(request.data["quantity"]) + instance.quantity
+                if Availability.objects.get(shop=instance.shop, product_info=instance.product).quantity > instance.quantity:
+                    #Для создания новых объектов корзины используется OrderItemCreateSerializer, который принимает для создания PK Shop, Product, Order
+                    serializer = OrderItemCreateSerializer(instance, data=request.data)
+                    serializer.is_valid(raise_exception=True)
+                    self.perform_update(serializer)
+                    return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+                else:
+                    return Response({'status': 'В данном магазине нет такого количества товара'}, status.HTTP_200_OK)
             else:
                 serializer = OrderItemCreateSerializer(data=request.data)
                 if serializer.is_valid(raise_exception=True):
                     serializer.save()
                     return Response(serializer.data, status=status.HTTP_200_OK)
         else:
-            #Если такого заказа нет, то создается новая корзина и заполняется указанным товаром
             request.data['order'] = Order.objects.create(user=request.user, status="basket").id
             serializer = OrderItemCreateSerializer(data=request.data)
             if serializer.is_valid(raise_exception=True):
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.serializer_class(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+
+
 # Функция, которая очищает корзину
     def delete(self, request):
         #Проверка наличия заказа или нескольких заказов, соответсвующих пользователю, со статусом "в корзине"
@@ -94,24 +111,37 @@ class BasketViewSet(ModelViewSet):
             basket = Order.objects.filter(user=request.user, status="basket")
             #Для каждого заказа из списка
             for element in basket:
-                #Получается список позиций Orderitems
-                items = Orderitem.objects.filter(order=element)
-                for item in items:
-                    #Каждая позиция в списке удаляется
-                    item.delete()
-                #Затем удаляется заказ со статусом "В корзине"
+                #Удаляется заказ со статусом "В корзине"
                 element.delete()
             return Response({"status": "Корзина очищена"},
-                            status=status.HTTP_200_OK)
+                            status=status.HTTP_204_NO_CONTENT)
         #Если заказа со статусом "в корзине" не существует, пользователь получает сообщение что корзина пуста
         else:
             return Response({"status": "Корзина уже пуста"},
-                            status=status.HTTP_200_OK)
+                            status=status.HTTP_204_NO_CONTENT)
 
 class ProductInfoViewSet(ModelViewSet):
     queryset = Productinfo.objects.all()
     serializer_class = ProductInfoSerializer
     http_method_names = ['post', 'get']
+
+    def list(self, request, *args, **kwargs):
+        objects = Productinfo.objects.all()
+        ###Анонимные пользователи или пользователи с типом учетной записи "покупатель" не видят параметр price_rrc
+        if request.user.is_anonymous or request.user.type == 'buyer':
+            self.serializer_class = ProducInfoForBuyerSerializer
+            return Response(self.serializer_class(objects, many=True).data, status.HTTP_200_OK)
+        else:
+            return Response(self.serializer_class(objects, many=True).data, status.HTTP_200_OK)
+
+
+    def retrieve(self, request, *args, **kwargs):
+        ###Анонимные пользователи или пользователи с типом учетной записи "покупатель" не видят параметр price_rrc
+        if request.user.is_anonymous or request.user.type == 'buyer':
+            self.serializer_class = ProducInfoForBuyerSerializer
+            return Response(self.serializer_class(self.get_object(), many=False).data, status.HTTP_200_OK)
+        else:
+            return Response(self.serializer_class(self.get_object(), many=False).data, status.HTTP_200_OK)
 
 
 #Вьюха для загрузки информации из Yaml файла
@@ -243,7 +273,7 @@ class ConfirmOrderViewset(ModelViewSet):
 class OrderViewSet(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated, IsOwner]
+    permission_classes = [IsAuthenticated]
     http_method_names = ['get', ]
 
     #Метод list возвращает список заказов пользователя, за исключением заказов со статусом "в корзине"

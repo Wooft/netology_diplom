@@ -45,7 +45,17 @@ class ProductInfoSerializer(serializers.ModelSerializer):
     parameters = ProductParameterSerializer(many=True)
     class Meta:
         model = Productinfo
+        fields = ['id', 'name', 'availability', 'parameters', 'price_rrc']
+
+class ProducInfoForBuyerSerializer(serializers.ModelSerializer):
+    availability = AvailableSerializer(many=True)
+    parameters = ProductParameterSerializer(many=True)
+
+    class Meta:
+        model = Productinfo
         fields = ['id', 'name', 'availability', 'parameters']
+
+
 class CustomUserSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -66,7 +76,7 @@ class BasketSerializer(serializers.ModelSerializer):
     shop = Shopserializer(many=False, read_only=True)
     class Meta:
         model = Orderitem
-        fields = ("product", "shop", "quantity")
+        fields = ("id", "product", "shop", "quantity")
 
 class OrderItemCreateSerializer(serializers.ModelSerializer):
 

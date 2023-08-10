@@ -111,7 +111,7 @@ class Orderitem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Productinfo, on_delete=models.CASCADE, related_name='product_in_order')
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField()
+    quantity = models.PositiveIntegerField(default=0)
 
 class Parameter(models.Model):
     name = models.CharField(verbose_name='Название', max_length=100, unique=True)
