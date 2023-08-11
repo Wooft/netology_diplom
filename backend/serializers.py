@@ -92,9 +92,11 @@ class ArdressSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class OrderSerializer(serializers.ModelSerializer):
+    # items = OrderitemGetSerizlizer(many=True, read_only=True)
     class Meta:
         model = Order
         fields = ["id", "dt", "status", "items"]
+        depth = 2
 
 class ContactSerializer(serializers.ModelSerializer):
 

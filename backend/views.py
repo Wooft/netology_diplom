@@ -1,9 +1,11 @@
+import pprint
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ViewSet
 from backend.models import Shop, Category, Product, Productinfo, Parameter, ProductParameter, CustomUser, Order, \
-    Orderitem, Contact, Availability
-from backend.permissions import BasketOwner
+    Orderitem, Contact, Availability, Adress
+from backend.permissions import BasketOwner, IsOwner
 from backend.serializers import Shopserializer, CategorySerializer, ProductInfoSerializer, CustomUserSerializer, \
     OrderSerializer, ContactSerializer, ArdressSerializer, OrderitemGetSerizlizer, \
     OrderItemCreateSerializer, BasketSerializer, ProducInfoForBuyerSerializer
@@ -32,7 +34,6 @@ class BasketViewSet(ModelViewSet):
     serializer_class = BasketSerializer
     permission_classes = [IsAuthenticated, BasketOwner]
     http_method_names = ["get", "post", "delete", "patch"]
-
     #Получение информации о текущей корзине
     #Доступна только зарегистрированным пользователям
     def list(self, request, *args, **kwargs):
@@ -237,7 +238,7 @@ class AccountViewset(APIView):
 class ConfirmOrderViewset(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    http_method_names = ["post", "get"]
+    http_method_names = ["post", "get", "patch"]
 
     #Используется для формы "спасибо за заказ"
     def retrieve(self, request, *args, **kwargs):
@@ -247,7 +248,6 @@ class ConfirmOrderViewset(ModelViewSet):
         positions = OrderitemGetSerizlizer(Orderitem.objects.filter(order=order), many=True)
         #Тут возвращаются детали получаетля
         contacts = ContactSerializer(Contact.objects.get(order=order))
-        print(contacts)
         return Response({"order_number": order.id,
                          "details": positions.data,
                          "contacts": contacts.data})
@@ -270,35 +270,49 @@ class ConfirmOrderViewset(ModelViewSet):
             return Response({"status": "Заказ уже оформлен"},status=status.HTTP_404_NOT_FOUND)
 
 
+
 class OrderViewSet(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated]
-    http_method_names = ['get', ]
+    permission_classes = [IsAuthenticated, IsOwner]
+    http_method_names = ['get', 'patch']
 
     #Метод list возвращает список заказов пользователя, за исключением заказов со статусом "в корзине"
     def list(self, request, *args, **kwargs):
         orders = Order.objects.filter(user=request.user).exclude(status='basket')
         seriazlizer = self.serializer_class(orders, many=True)
         for order in seriazlizer.data:
-            sum = 0
-            for item in order['items']:
-                sum += Orderitem.objects.get(id=item).product.price * Orderitem.objects.get(id=item).quantity
-            order.pop('items')
-            #В заказ включается поле "сумма"
-            order['summ'] = sum
+            summ = 0
+            for product in order['items']:
+                summ += product['quantity'] * Availability.objects.get(product_info=product['product']['id'], shop=product['shop']['id']).price
+            del order['items']
+            order['summ'] = summ
         return Response(seriazlizer.data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, *args, **kwargs):
-        data = self.serializer_class(self.get_object()).data
-        templist = []
-        for element in data['items']:
-            item = OrderitemGetSerizlizer(Orderitem.objects.get(id=element)).data
-            item['summ'] = float(item['product']['price']) * item['quantity']
-            templist.append(item)
-        data['items'] = templist
-        data['contact'] = ContactSerializer(Contact.objects.get(order=data['id'])).data
-        data['adress'] = ArdressSerializer(self.get_object().adress.get()).data
-        return Response(data, status=status.HTTP_200_OK)
-
+        if self.get_object().status == "basket":
+            return Response({'status': 'Заказ еще не оформлен'}, status=status.HTTP_200_OK)
+        else:
+            detals = []
+            data = self.serializer_class(self.get_object()).data
+            for item in data['items']:
+                price = Productinfo.objects.get(id=item['product']['id']).availability.get(shop=item['shop']['id']).price
+                detals.append({
+                    'name': item['product']['name'],
+                    'shop': item['shop']['name'],
+                    'price': price,
+                    'quantity': item['quantity'],
+                    'summ': price * item['quantity']
+                })
+            data['details'] = detals
+            try:
+                data['recipient'] = ContactSerializer(data=Contact.objects.get(order=data['id'])).data
+            except:
+                data['recipient'] = None
+            try:
+                data['adress'] = ArdressSerializer(data=Adress.objects.get(order=data['id'])).data
+            except:
+                data['adress'] = None
+            data.pop('items')
+            return Response(data, status=status.HTTP_200_OK)
 
