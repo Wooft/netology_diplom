@@ -1,5 +1,3 @@
-import pprint
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ViewSet
@@ -258,16 +256,22 @@ class ConfirmOrderViewset(ModelViewSet):
             request.data["adress"]["order"] = order.id
             contact = ContactSerializer(data=request.data["contact"])
             adress = ArdressSerializer(data=request.data["adress"])
+            #Проверка наличия в магазинах нужного количествва товара
+            for item in order.items.all():
+                if Availability.objects.get(product_info=item.product, shop=item.shop).quantity < item.quantity:
+                    return Response({'status': f'Товара {item.product.name} нет в достаточном количестве в магазине {item.shop}'})
+                else:
+                    pass
             if contact.is_valid(raise_exception=True) and adress.is_valid(raise_exception=True):
                 order.status = "confirmed"
                 contact.save()
                 adress.save()
                 order.save()
-                return Response({"status": "all_valid", f"Заказ №{order.id}": f"{order.status}"},
+                return Response({"status": "Заказ подтвержден", f"Заказ №{order.id}": f"{order.status}"},
                                 status=status.HTTP_201_CREATED)
 
         else:
-            return Response({"status": "Заказ уже оформлен"},status=status.HTTP_404_NOT_FOUND)
+            return Response({"status": "Заказ уже оформлен"},status=status.HTTP_204_NO_CONTENT)
 
 
 

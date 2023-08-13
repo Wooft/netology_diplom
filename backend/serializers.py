@@ -91,6 +91,10 @@ class ArdressSerializer(serializers.ModelSerializer):
         model = Adress
         fields = '__all__'
 
+    def create(self, validated_data):
+        instance = Adress.objects.get_or_create(**validated_data)
+        return instance
+
 class OrderSerializer(serializers.ModelSerializer):
     # items = OrderitemGetSerizlizer(many=True, read_only=True)
     class Meta:
@@ -103,3 +107,7 @@ class ContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact
         fields = '__all__'
+
+    def create(self, validated_data):
+        instance = Contact.objects.get_or_create(**validated_data)
+        return instance
