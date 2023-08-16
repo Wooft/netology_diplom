@@ -13,6 +13,7 @@ import yaml
 from yaml.loader import SafeLoader
 import re
 from rest_framework.permissions import IsAuthenticated
+from django.http import HttpResponseRedirect, HttpResponseBadRequest
 
 class ShopViewSet(ModelViewSet):
     queryset = Shop.objects.all()
@@ -67,30 +68,34 @@ class BasketViewSet(ModelViewSet):
         if Order.objects.filter(user=request.user, status="basket").exists():
             #Если да, то он добавляется в request.data"
             request.data["order"] = Order.objects.filter(user=request.user, status="basket")[0].id
+
             #Проверка на наличие Orderitem в базе данных
             if Orderitem.objects.filter(order=request.data["order"], product=request.data["product"], shop=request.data["shop"]).exists():
                 instance = Orderitem.objects.filter(order=request.data["order"], product=request.data["product"], shop=request.data["shop"])[0]
                 #Проверка того что в указанном магазине находится достаточное количество товара в наличии
                 request.data["quantity"] = int(request.data["quantity"]) + instance.quantity
-                if Availability.objects.get(shop=instance.shop, product_info=instance.product).quantity > instance.quantity:
+                if Availability.objects.get(shop=instance.shop, product_info=instance.product).quantity > request.data['quantity']:
                     #Для создания новых объектов корзины используется OrderItemCreateSerializer, который принимает для создания PK Shop, Product, Order
                     serializer = OrderItemCreateSerializer(instance, data=request.data)
                     serializer.is_valid(raise_exception=True)
                     self.perform_update(serializer)
                     return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
                 else:
-                    return Response({'status': 'В данном магазине нет такого количества товара'}, status.HTTP_200_OK)
+                    return Response({'status': 'В данном магазине нет такого количества товара'}, status.HTTP_400_BAD_REQUEST)
             else:
                 serializer = OrderItemCreateSerializer(data=request.data)
                 if serializer.is_valid(raise_exception=True):
                     serializer.save()
                     return Response(serializer.data, status=status.HTTP_200_OK)
         else:
-            request.data['order'] = Order.objects.create(user=request.user, status="basket").id
-            serializer = OrderItemCreateSerializer(data=request.data)
-            if serializer.is_valid(raise_exception=True):
-                serializer.save()
-                return Response(serializer.data, status=status.HTTP_200_OK)
+            if Availability.objects.get(shop=request.data['shop'], product_info=request.data['product']).quantity > int(request.data['quantity']):
+                request.data['order'] = Order.objects.create(user=request.user, status="basket").id
+                serializer = OrderItemCreateSerializer(data=request.data)
+                if serializer.is_valid(raise_exception=True):
+                    serializer.save()
+                    return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                return Response({'status': 'В данном магазине нет такого количества товара'}, status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
@@ -147,7 +152,7 @@ class ProductInfoViewSet(ModelViewSet):
 class YamlUploadView(APIView):
     #Обрабатывает метод POST
     def post(self, request):
-        pattern = '(\.[A-Za-z]*)'
+        pattern = r'(\.[A-Za-z]*)'
         #Выброс ошибки, если отсуствует файл - вложение
         if request.FILES.get('file') == None:
             return Response(
@@ -238,40 +243,35 @@ class ConfirmOrderViewset(ModelViewSet):
     serializer_class = OrderSerializer
     http_method_names = ["post", "get", "patch"]
 
-    #Используется для формы "спасибо за заказ"
+    #Функция retrive перенаправляет пользователя на страницу заказа по марщруту '/orders'
     def retrieve(self, request, *args, **kwargs):
-        order = self.get_object()
-        #Тут возвращается номер заказа
-        #Тут возвращаются детали заказа
-        positions = OrderitemGetSerizlizer(Orderitem.objects.filter(order=order), many=True)
-        #Тут возвращаются детали получаетля
-        contacts = ContactSerializer(Contact.objects.get(order=order))
-        return Response({"order_number": order.id,
-                         "details": positions.data,
-                         "contacts": contacts.data})
+        return HttpResponseRedirect(f'/orders/{self.get_object().id}/')
 
     def create(self, request, *args, **kwargs):
-        order = Order.objects.get(id=request.data["contact"]["order"])
-        if order.status == 'new':
-            request.data["adress"]["order"] = order.id
-            contact = ContactSerializer(data=request.data["contact"])
-            adress = ArdressSerializer(data=request.data["adress"])
-            #Проверка наличия в магазинах нужного количествва товара
-            for item in order.items.all():
-                if Availability.objects.get(product_info=item.product, shop=item.shop).quantity < item.quantity:
-                    return Response({'status': f'Товара {item.product.name} нет в достаточном количестве в магазине {item.shop}'})
-                else:
-                    pass
-            if contact.is_valid(raise_exception=True) and adress.is_valid(raise_exception=True):
-                order.status = "confirmed"
-                contact.save()
-                adress.save()
-                order.save()
-                return Response({"status": "Заказ подтвержден", f"Заказ №{order.id}": f"{order.status}"},
-                                status=status.HTTP_201_CREATED)
+        try:
+            order = Order.objects.get(id=request.data["contact"]["order"])
+            if order.status == 'new':
+                request.data["adress"]["order"] = order.id
+                contact = ContactSerializer(data=request.data["contact"])
+                adress = ArdressSerializer(data=request.data["adress"], many=False)
+                #Проверка наличия в магазинах нужного количествва товара
+                for item in order.items.all():
+                    if Availability.objects.get(product_info=item.product, shop=item.shop).quantity < item.quantity:
+                        return Response({'status': f'Товара {item.product.name} нет в достаточном количестве в магазине {item.shop}'}, status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        pass
+                if contact.is_valid(raise_exception=True) and adress.is_valid(raise_exception=True):
+                    order.status = "confirmed"
+                    contact.save()
+                    adress.save()
+                    order.save()
+                    return Response({"status": "Заказ подтвержден", f"Заказ №{order.id}": f"{order.status}"},
+                                    status=status.HTTP_201_CREATED)
 
-        else:
-            return Response({"status": "Заказ уже оформлен"},status=status.HTTP_204_NO_CONTENT)
+            else:
+                return Response({"status": "Заказ уже оформлен"}, status=status.HTTP_204_NO_CONTENT)
+        except KeyError:
+            return Response({'status': 'Не хватает данных'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -296,6 +296,17 @@ class OrderViewSet(ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         if self.get_object().status == "basket":
             return Response({'status': 'Заказ еще не оформлен'}, status=status.HTTP_200_OK)
+        elif self.get_object().status == "created":
+            order = self.get_object()
+            if order.status == 'confirmed':
+                # Тут возвращается номер заказа
+                # Тут возвращаются детали заказа
+                positions = OrderitemGetSerizlizer(Orderitem.objects.filter(order=order), many=True)
+                # Тут возвращаются детали получаетля
+                contacts = ContactSerializer(Contact.objects.get(order=order))
+                return Response({"order_number": order.id,
+                                 "details": positions.data,
+                                 "contacts": contacts.data})
         else:
             detals = []
             data = self.serializer_class(self.get_object()).data

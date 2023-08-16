@@ -9,7 +9,8 @@ USER_TYPE_CHOICES = (
 
 ORDER_STATE_CHOICES = (
     ('basket', 'Корзина'),
-    ('new', 'новый'),
+    ('new', 'Новый'),
+    ('created', 'Создан'),
     ('confirmed', 'Подтвержен')
 )
 
@@ -126,14 +127,15 @@ class Availability(models.Model):
     price = models.DecimalField(verbose_name='Цена', decimal_places=2, max_digits=10)
     quantity = models.PositiveIntegerField(verbose_name='Количество')
 
+    objects = models.Manager()
 #Модель для сохранения адреса пользователя
 class Adress(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='adress')
+    order = models.ManyToManyField(Order, related_name='adress', blank=False, null=False)
     city = models.CharField(max_length=50, verbose_name="Город", blank=False, null=False)
     street = models.CharField(max_length=150, verbose_name="Улица", blank=False, null=False)
     home = models.CharField(verbose_name="Дом", blank=False, null=False)
-    structure = models.CharField(max_length=10, verbose_name="Корпус", blank=True)
-    building = models.CharField(max_length=10, verbose_name="Строение", blank=True)
+    structure = models.CharField(max_length=10, verbose_name="Корпус", blank=True, null=True)
+    building = models.CharField(max_length=10, verbose_name="Строение", blank=True, null=True)
     apartment = models.CharField(max_length=10, verbose_name="Квартира / Офис", blank=True)
     is_save = models.BooleanField(default=False)
 
@@ -142,9 +144,9 @@ class Adress(models.Model):
 
 #Модель для сохранения контактного лица в заказе
 class Contact(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE)
-    name = models.CharField(max_length=100, verbose_name="Имя", null=False)
-    last_name = models.CharField(max_length=150, verbose_name="Фамилия")
-    surname = models.CharField(max_length=150, verbose_name="Отчество")
-    email = models.EmailField(verbose_name="Email")
-    phone = models.CharField(max_length=12, verbose_name="Номер телефона", null=False)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='contact', blank=False, null=False)
+    name = models.CharField(max_length=100, verbose_name="Имя", null=False, blank=False)
+    last_name = models.CharField(max_length=150, verbose_name="Фамилия", null=False, blank=False)
+    surname = models.CharField(max_length=150, verbose_name="Отчество", blank=True, null=True)
+    email = models.EmailField(verbose_name="Email", blank=False, null=False)
+    phone = models.CharField(max_length=12, verbose_name="Номер телефона", null=False, blank=False)

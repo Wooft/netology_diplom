@@ -85,18 +85,8 @@ class OrderItemCreateSerializer(serializers.ModelSerializer):
         model = Orderitem
         fields = "__all__"
 
-class ArdressSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Adress
-        fields = '__all__'
-
-    def create(self, validated_data):
-        instance = Adress.objects.get_or_create(**validated_data)
-        return instance
 
 class OrderSerializer(serializers.ModelSerializer):
-    # items = OrderitemGetSerizlizer(many=True, read_only=True)
     class Meta:
         model = Order
         fields = ["id", "dt", "status", "items"]
@@ -110,4 +100,14 @@ class ContactSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         instance = Contact.objects.get_or_create(**validated_data)
+        return instance
+
+class ArdressSerializer(serializers.ModelSerializer):
+    order = OrderSerializer(many=False, read_only=True)
+    class Meta:
+        model = Adress
+        fields = '__all__'
+
+    def create(self, validated_data):
+        instance = Adress.objects.get_or_create(**validated_data)
         return instance
