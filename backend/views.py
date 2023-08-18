@@ -241,17 +241,13 @@ class AccountViewset(APIView):
 class ConfirmOrderViewset(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    http_method_names = ["post", "get", "patch"]
-
-    #Функция retrive перенаправляет пользователя на страницу заказа по марщруту '/orders'
-    def retrieve(self, request, *args, **kwargs):
-        return HttpResponseRedirect(f'/orders/{self.get_object().id}/')
+    http_method_names = ["post"]
 
     def create(self, request, *args, **kwargs):
         try:
             order = Order.objects.get(id=request.data["contact"]["order"])
             if order.status == 'new':
-                request.data["adress"]["order"] = order.id
+                request.data["adress"]["order"] = [order.id, ]
                 contact = ContactSerializer(data=request.data["contact"])
                 adress = ArdressSerializer(data=request.data["adress"], many=False)
                 #Проверка наличия в магазинах нужного количествва товара
@@ -265,7 +261,7 @@ class ConfirmOrderViewset(ModelViewSet):
                     contact.save()
                     adress.save()
                     order.save()
-                    return Response({"status": "Заказ подтвержден", f"Заказ №{order.id}": f"{order.status}"},
+                    return Response({"status": "Заказ создан", f"Заказ №{order.id}": f"{order.status}"},
                                     status=status.HTTP_201_CREATED)
 
             else:
@@ -294,19 +290,20 @@ class OrderViewSet(ModelViewSet):
         return Response(seriazlizer.data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, *args, **kwargs):
-        if self.get_object().status == "basket":
+        order = self.get_object()
+        if order.status == "basket":
             return Response({'status': 'Заказ еще не оформлен'}, status=status.HTTP_200_OK)
-        elif self.get_object().status == "created":
+        #Возврат формы - "спасибо за заказ
+        elif order.status == 'confirmed':
             order = self.get_object()
-            if order.status == 'confirmed':
                 # Тут возвращается номер заказа
                 # Тут возвращаются детали заказа
-                positions = OrderitemGetSerizlizer(Orderitem.objects.filter(order=order), many=True)
+            positions = OrderitemGetSerizlizer(Orderitem.objects.filter(order=order), many=True)
                 # Тут возвращаются детали получаетля
-                contacts = ContactSerializer(Contact.objects.get(order=order))
-                return Response({"order_number": order.id,
-                                 "details": positions.data,
-                                 "contacts": contacts.data})
+            contacts = ContactSerializer(Contact.objects.get(order=order))
+            return Response({"order_number": order.id,
+                             "details": positions.data,
+                             "contacts": contacts.data})
         else:
             detals = []
             data = self.serializer_class(self.get_object()).data
@@ -321,11 +318,11 @@ class OrderViewSet(ModelViewSet):
                 })
             data['details'] = detals
             try:
-                data['recipient'] = ContactSerializer(data=Contact.objects.get(order=data['id'])).data
+                data['recipient'] = ContactSerializer(Contact.objects.get(order=data['id'])).data
             except:
                 data['recipient'] = None
             try:
-                data['adress'] = ArdressSerializer(data=Adress.objects.get(order=data['id'])).data
+                data['adress'] = ArdressSerializer(Adress.objects.get(order=data['id'])).data
             except:
                 data['adress'] = None
             data.pop('items')

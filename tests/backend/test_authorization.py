@@ -14,7 +14,8 @@ def user_sample():
         "company": "test_company",
         "position": "test_position",
         "password": "test_password",
-        "repeatpassword": "test_password"
+        "repeatpassword": "test_password",
+        "type": "shop"
     }
     return user
 
@@ -27,6 +28,7 @@ def test_create_user(client, user_sample):
     user = CustomUser.objects.get(email=user_sample['email'])
     assert response.status_code == 201
     assert user.first_name == user_sample['first_name']
+    assert user.type == 'buyer'
 
 @pytest.mark.django_db
 def test_create_empty_user(client):

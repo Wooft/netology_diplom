@@ -3,7 +3,7 @@ import random
 import pytest
 from rest_framework.test import APIClient
 from model_bakery import baker
-from backend.models import Productinfo, CustomUser, Shop, Availability, Order, Orderitem
+from backend.models import Productinfo, CustomUser, Shop, Availability, Order, Orderitem, Contact, Adress
 import tempfile
 
 
@@ -137,6 +137,11 @@ def order_bakery(user):
         statuses = ['basket', 'new', 'created', 'confirmed']
         for status in statuses:
             orders = baker.make(Order, status=status, user=CustomUser.objects.get(email=user['email']), _quantity=4)
+            if status == 'created' or status == 'confirmed':
+                for order in orders:
+                    baker.make(Contact, order=order)
+                    adress = baker.make(Adress)
+                    adress.order.add(order)
             list_orders.extend(orders)
         shops = baker.make(Shop, _quantity=5)
         products = baker.make(Productinfo, _quantity=10)
@@ -297,7 +302,7 @@ def test_get_basket(client, user, buyer_client, create_basket):
 
 ### Тестирование подтверждаения заказа
 @pytest.mark.django_db
-def test_confirm_order(auth_client, buyer_client, shop_client, user, create_basket, unauth_client):
+def test_confirm_order(auth_client, buyer_client, create_basket, unauth_client):
     basket = create_basket['order']
     buyer_response = buyer_client.patch(f'/orders/{basket.id}/', data={
         'status': 'new'
@@ -337,6 +342,8 @@ def test_confirm_order(auth_client, unauth_client, order_bakery, confirm_order_d
                 response = auth_client.post('/confirm_order/', data=data)
                 assert response.status_code == 400
                 assert Order.objects.get(id=order.id).status == 'new'
+
+    #Тест на ответ, если количество товара в заказе больше, чем количество товара в наличии
     order = baker.make(Order, status='new')
     data['contact']['order'] = order.id
     for contact in data['contact']:
@@ -349,3 +356,24 @@ def test_confirm_order(auth_client, unauth_client, order_bakery, confirm_order_d
             order.save()
         else:
             assert response.status_code == 400
+
+###Тест на получение истории заказов
+@pytest.mark.django_db
+def test_history_orders(auth_client, unauth_client, order_bakery, buyer_client):
+    orders = order_bakery()
+
+    response = unauth_client.get('/orders/')
+    assert response.status_code == 401
+    response = auth_client.get('/orders/')
+    assert response.status_code == 200
+    for order in response.data:
+        assert order['status'] != 'basket'
+    assert len(Order.objects.all().exclude(status='basket')) == len(response.data)
+    for order in orders:
+        buyer_response = buyer_client.get(f'/orders/{order.id}/')
+        assert buyer_response.status_code == 403
+        response = auth_client.get(f'/orders/{order.id}/')
+        assert response.status_code == 200
+        if order.status == 'created':
+            assert order.adress.all()[0].city == response.data['adress']['city']
+            assert order.contact.all()[0].name == response.data['recipient']['name']

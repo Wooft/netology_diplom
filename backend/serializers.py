@@ -103,11 +103,13 @@ class ContactSerializer(serializers.ModelSerializer):
         return instance
 
 class ArdressSerializer(serializers.ModelSerializer):
-    order = OrderSerializer(many=False, read_only=True)
+    order = OrderSerializer
     class Meta:
         model = Adress
         fields = '__all__'
 
     def create(self, validated_data):
-        instance = Adress.objects.get_or_create(**validated_data)
+        order = validated_data.pop('order')[0]
+        instance = Adress.objects.get_or_create(**validated_data)[0]
+        instance.order.add(order)
         return instance
