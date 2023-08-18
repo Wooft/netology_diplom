@@ -25,7 +25,7 @@ APPEND_SLASH=True
 SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG')
+DEBUG = False
 ALLOWED_HOSTS = config('ALLOWED_HOSTS').split(sep=",")
 
 
