@@ -129,7 +129,7 @@ class Availability(models.Model):
     objects = models.Manager()
 #Модель для сохранения адреса пользователя
 class Adress(models.Model):
-    order = models.ManyToManyField(Order, related_name='adress', blank=False, null=False)
+    order = models.ManyToManyField(Order, related_name='adress')
     city = models.CharField(max_length=50, verbose_name="Город", blank=False, null=False)
     street = models.CharField(max_length=150, verbose_name="Улица", blank=False, null=False)
     home = models.CharField(verbose_name="Дом", blank=False, null=False)

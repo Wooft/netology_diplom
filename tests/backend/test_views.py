@@ -361,10 +361,10 @@ def test_confirm_order(auth_client, unauth_client, order_bakery, confirm_order_d
 @pytest.mark.django_db
 def test_history_orders(auth_client, unauth_client, order_bakery, buyer_client):
     orders = order_bakery()
-
     response = unauth_client.get('/orders/')
     assert response.status_code == 401
     response = auth_client.get('/orders/')
+    print(response)
     assert response.status_code == 200
     for order in response.data:
         assert order['status'] != 'basket'
