@@ -290,7 +290,6 @@ class OrderViewSet(ModelViewSet):
                 summ += product['quantity'] * Availability.objects.get(product_info=product['product']['id'], shop=product['shop']['id']).price
             del order['items']
             order['summ'] = summ
-        return HttpResponseRedirect('/')
         return Response(seriazlizer.data, status=status.HTTP_200_OK)
     def retrieve(self, request, *args, **kwargs):
         order = self.get_object()
