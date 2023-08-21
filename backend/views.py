@@ -13,7 +13,9 @@ import yaml
 from yaml.loader import SafeLoader
 import re
 from rest_framework.permissions import IsAuthenticated
-from django.http import HttpResponseRedirect, HttpResponseBadRequest
+from django.http import HttpResponseRedirect
+from django.shortcuts import redirect
+from django.urls import reverse
 
 class ShopViewSet(ModelViewSet):
     queryset = Shop.objects.all()
@@ -127,7 +129,7 @@ class BasketViewSet(ModelViewSet):
 class ProductInfoViewSet(ModelViewSet):
     queryset = Productinfo.objects.all()
     serializer_class = ProductInfoSerializer
-    http_method_names = ['post', 'get']
+    http_method_names = ['get']
 
     def list(self, request, *args, **kwargs):
         objects = Productinfo.objects.all()
@@ -242,6 +244,7 @@ class ConfirmOrderViewset(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     http_method_names = ["post"]
+    permission_classes = [IsAuthenticated, IsOwner]
 
     def create(self, request, *args, **kwargs):
         try:
@@ -287,8 +290,8 @@ class OrderViewSet(ModelViewSet):
                 summ += product['quantity'] * Availability.objects.get(product_info=product['product']['id'], shop=product['shop']['id']).price
             del order['items']
             order['summ'] = summ
+        return HttpResponseRedirect('/')
         return Response(seriazlizer.data, status=status.HTTP_200_OK)
-
     def retrieve(self, request, *args, **kwargs):
         order = self.get_object()
         if order.status == "basket":
@@ -327,4 +330,3 @@ class OrderViewSet(ModelViewSet):
                 data['adress'] = None
             data.pop('items')
             return Response(data, status=status.HTTP_200_OK)
-
