@@ -25,7 +25,7 @@ APPEND_SLASH=True
 SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = config('DEBUG')
 ALLOWED_HOSTS = config('ALLOWED_HOSTS').split(sep=",")
 
 
@@ -158,3 +158,11 @@ INTERNAL_IPS = [
 ]
 
 LOGIN_REDIRECT_URL = "/"
+
+# django_celery/settings.py
+
+# ...
+
+# Celery settings
+CELERY_BROKER_URL = config('CELERY_BROKER_URL')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND')
