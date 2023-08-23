@@ -57,6 +57,8 @@ class CustomUser(AbstractUser, PermissionsMixin):
         verbose_name_plural = 'Пользователи'
         ordering = ('email', )
 
+    objects = models.Manager
+
 
 #Модель заказа, содержит информацию о дате создания и статусе заказа
 class Order(models.Model):
@@ -68,6 +70,8 @@ class Order(models.Model):
 
     def __str__(self):
         return f'Заказ №{self.id}'
+
+    objects = models.Manager
 
 class Shop(models.Model):
     name = models.CharField(verbose_name='Название магазина',
@@ -84,6 +88,8 @@ class Shop(models.Model):
     def __str__(self):
         return f'{self.name}'
 
+    objects = models.Manager
+
 class Category(models.Model):
     shops = models.ManyToManyField(Shop, related_name='categories')
     name = models.CharField(verbose_name='Категория', max_length=50, unique=True)
@@ -91,12 +97,16 @@ class Category(models.Model):
     def __str__(self):
         return f'{self.name}'
 
+    objects = models.Manager
+
 class Product(models.Model):
     model = models.CharField(verbose_name='Модель', max_length=50, unique=True)
     category = models.ForeignKey(Category, verbose_name='Категории', on_delete=models.CASCADE)
 
     def __str__(self):
         return f'{self.model}'
+
+    objects = models.Manager
 
 class Productinfo(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='info')
@@ -106,6 +116,8 @@ class Productinfo(models.Model):
                                     decimal_places=2,
                                     max_digits=10)
 
+    objects = models.Manager
+
 
 class Orderitem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
@@ -113,12 +125,18 @@ class Orderitem(models.Model):
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=0)
 
+    objects = models.Manager
+
 class Parameter(models.Model):
     name = models.CharField(verbose_name='Название', max_length=100, unique=True)
+
+    objects = models.Manager
 class ProductParameter(models.Model):
     product_info = models.ForeignKey(Productinfo, on_delete=models.CASCADE, related_name='parameters')
     parameter = models.ForeignKey(Parameter, on_delete=models.CASCADE, related_name='product_info')
     value = models.CharField()
+
+    objects = models.Manager
 ### Таблица "Наличие", через нее реализована связь многие-ко-многим таблиц "product_info" и "shop", сожержит информацию о актуальных ценах и наличии товара
 class Availability(models.Model):
     product_info = models.ForeignKey(Productinfo, on_delete=models.CASCADE, related_name='availability')
@@ -141,6 +159,8 @@ class Adress(models.Model):
     def __str__(self):
         return f"Город: {self.city}, улица: {self.street}, дом {self.home}"
 
+    objects = models.Manager
+
 #Модель для сохранения контактного лица в заказе
 class Contact(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='contact', blank=False, null=False)
@@ -149,3 +169,5 @@ class Contact(models.Model):
     surname = models.CharField(max_length=150, verbose_name="Отчество", blank=True, null=True)
     email = models.EmailField(verbose_name="Email", blank=False, null=False)
     phone = models.CharField(max_length=12, verbose_name="Номер телефона", null=False, blank=False)
+
+    objects = models.Manager
