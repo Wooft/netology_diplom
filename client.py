@@ -3,7 +3,7 @@ import datetime
 import requests
 
 def yaml_upload():
-    url = 'http://127.0.0.1:8000/yamlupload/'
+    url = 'http://127.0.0.1:6060/yamlupload/'
     file = open('example.yaml', 'rb')
     file = {'file': file}
     headers = {

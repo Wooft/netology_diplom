@@ -23,4 +23,4 @@ redis
 drf-spectacular
 social-auth-app-django
 social-auth-app-django-mongoengine
-mongoengine
+django-silk

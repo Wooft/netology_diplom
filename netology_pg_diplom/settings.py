@@ -209,10 +209,6 @@ SOCIAL_AUTH_AUTHENTICATION_BACKENDS = [
     'social_core.backends.vk.VKOAuth2',
 ]
 
-SOCIAL_AUTH_PIPELINE = (
-    'social_core.pipeline.social_auth.associate_by_email',
-)
-
 LOGIN_URL = 'login'
 
 SOCIAL_AUTH_JSONFIELD_ENABLED = True

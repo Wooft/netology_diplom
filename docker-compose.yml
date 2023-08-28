@@ -1,70 +1,70 @@
 version: '3.8'
 
 services:
-#  dyplom_project:
-#    build: .
-#    env_file:
-#      - .env_dev
-#    command: >
-#      sh -c "python manage.py collectstatic --noinput &&
-#             python manage.py migrate &&
-#             gunicorn netology_pg_diplom.wsgi:application --bind 0.0.0.0:8000"
-#    expose:
-#      - 8000
-#    networks:
-#      - automation
-#    depends_on:
-#      - db
-#
-#  db:
-#    image: postgres
-#    hostname: db
-#    restart: always
-#    env_file:
-#      - .env_dev
-#    environment:
-#      - POSTRES_USER=$DB_USER
-#      - POSTGRES_PASSWORD=$DB_PASSWORD
-#      - POSTGRES_DB=$DB_NAME
-#    volumes:
-#      - postgres_data:/var/lib/postgresql/data/
-#    networks:
-#      - automation
-#
-#  nginx:
-#    build: ./nginx
-#    ports:
-#      - 6060:80
-#    depends_on:
-#      - celery-worker
-#    volumes:
-#      - ./static:/static
-#    networks:
-#      - automation
+  dyplom_project:
+    build: .
+    env_file:
+      - .env_dev
+    command: >
+      sh -c "python manage.py collectstatic --noinput &&
+             python manage.py migrate &&
+             gunicorn netology_pg_diplom.wsgi:application --bind 0.0.0.0:8000"
+    expose:
+      - 8000
+    networks:
+      - automation
+    depends_on:
+      - db
+
+  db:
+    image: postgres
+    hostname: db
+    restart: always
+    env_file:
+      - .env_dev
+    environment:
+      - POSTRES_USER=$DB_USER
+      - POSTGRES_PASSWORD=$DB_PASSWORD
+      - POSTGRES_DB=$DB_NAME
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    networks:
+      - automation
+
+  nginx:
+    build: ./nginx
+    ports:
+      - 6060:80
+    depends_on:
+      - celery-worker
+    volumes:
+      - ./static:/static
+    networks:
+      - automation
 
   redis:
     image: redis
     ports:
       - "6379:6379"
-#    networks:
-#      - automation
-#    depends_on:
-#      - dyplom_project
+    networks:
+      - automation
+    depends_on:
+      - dyplom_project
 
-#  celery-worker:
-#    build: .
-#    container_name: celery-worker
-#    env_file:
-#      - .env_dev
-#    restart: always
-#    command: python -m celery -A netology_pg_diplom worker -l info
-#    depends_on:
-#      - redis
-#    networks:
-#      - automation
-#
-#volumes:
-#  postgres_data:
-#
-#networks:
-#  automation:
+  celery-worker:
+    build: .
+    container_name: celery-worker
+    env_file:
+      - .env_dev
+    restart: always
+    command: python -m celery -A netology_pg_diplom worker -l info
+    depends_on:
+      - redis
+    networks:
+      - automation
+
+volumes:
+  postgres_data:
+
+networks:
+  automation:
