@@ -19,7 +19,7 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken.views import obtain_auth_token
-
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from backend.views import CategoryViewSet, ShopViewSet, YamlUploadView, ProductInfoViewSet, RegisterUser, \
     BasketViewSet, ConfirmOrderViewset, OrderViewSet, AccountViewset
 
@@ -34,10 +34,13 @@ r.register('orders', OrderViewSet)
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('yamlupload/', YamlUploadView.as_view()),
-    #Путь для сессионной авторизации
     path('auth/', include('rest_framework.urls')),
     path('get_token/', obtain_auth_token),
     path('register/', RegisterUser.as_view()),
     path('__debug__/', include(debug_toolbar.urls)),
-    path('myaccount/', AccountViewset.as_view())
+    path('myaccount/', AccountViewset.as_view()),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='docs'),
+    path('', include('social_django.urls', namespace='social')),
+
 ] + r.urls

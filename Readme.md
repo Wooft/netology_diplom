@@ -33,3 +33,16 @@
 Доступна по маршруту 'orders' - отображает список заказов, кроме заказов со статусом 'basket'.
 8. Заказ  
 Доступна по маршруту 'orders/order.id' для всех заказов, кроме тех что имеют статус 'basket'.
+
+В проекте доступна авторизация через социальные сети (модуль django-social-auth).
+Для регистрации при помощи соц. сети VK необходимо:  
+ - создать приложение VK с активным Open API
+ - в environ указать VK_KEY (ID приложения) и VK_SECRET (Защищённый ключ приложения)
+Для авторизации используется маршрут '/login/vk-oauth2'
+Подробнее можно ознакомиться в документации: https://python-social-auth.readthedocs.io/en/latest/backends/vk.html
+
+Для регистрации через Google необзодимо:
+- создать API в https://console.cloud.google.com/apis/. Туториал: 
+- 
+http://127.0.0.1:8000/social-auth/login/google-oauth2/
+http://127.0.0.1:8000/login/google-oauth2/

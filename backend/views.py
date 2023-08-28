@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-from backend.models import Shop, Category, Product, Productinfo, Parameter, ProductParameter, Order, \
+from backend.models import Shop, Category, Productinfo, Order, \
     Orderitem, Contact, Availability, Adress
 from backend.permissions import BasketOwner, IsOwner
 from backend.serializers import Shopserializer, CategorySerializer, ProductInfoSerializer, CustomUserSerializer, \
@@ -13,8 +13,9 @@ import yaml
 from yaml.loader import SafeLoader
 import re
 from rest_framework.permissions import IsAuthenticated
-
+from drf_spectacular.utils import extend_schema_view, extend_schema
 from backend.tasks import yaml_upload_task
+from social_core.backends.vk import VKOAuth2
 
 
 class ShopViewSet(ModelViewSet):
@@ -31,6 +32,11 @@ class CategoryViewSet(ModelViewSet):
 # product - id продукта, добавляемого в корзину
 # shop - id магазина, в котором выбирается продукт
 # quantity - количество единиц добавляемого продукта
+@extend_schema_view(
+    list=extend_schema(
+        summary='Получить содержимое корзины'
+    )
+)
 class BasketViewSet(ModelViewSet):
     queryset = Orderitem.objects.all()
     # В serializer_class находится сериалайзер, который отвечает за вывод иноформации
@@ -133,6 +139,11 @@ class BasketViewSet(ModelViewSet):
                             status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary='Получение списка товаров'
+    )
+)
 class ProductInfoViewSet(ModelViewSet):
     queryset = Productinfo.objects.all()
     serializer_class = ProductInfoSerializer
@@ -157,12 +168,17 @@ class ProductInfoViewSet(ModelViewSet):
 
 
 # Вьюха для загрузки информации из Yaml файла
+@extend_schema_view(
+    list=extend_schema(
+        summary='Загрузка файла данных от магазина в YAML формате'
+    )
+)
 class YamlUploadView(APIView):
     # Обрабатывает метод POST
     def post(self, request):
         pattern = r'(\.[A-Za-z]*)'
         # Выброс ошибки, если отсуствует файл - вложение
-        if request.FILES.get('file') == None:
+        if request.FILES.get('file') is None:
             return Response(
                 {'status': 'please load correct yaml file'}, status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
             )
@@ -176,7 +192,7 @@ class YamlUploadView(APIView):
             yaml_upload_task.delay(data=yaml.load(request.FILES['file'].read(), Loader=SafeLoader), filename=request.FILES['file'].name)
 
             return Response({
-                'status': 'Да принял я твой файл'
+                'status': 'ok'
             })
 
 
@@ -193,7 +209,7 @@ class RegisterUser(APIView):
                 request.data['password'] = make_password(request.data['password'])
                 request.data.pop('repeatpassword')
                 # Тип пользоватлея при создании - всегда покупатель, менять его могут админы. Из запроса информация удаляется.
-                if request.data.get('type') != None:
+                if request.data.get('type') is not None:
                     request.data.pop('type')
             serializer = CustomUserSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -210,7 +226,11 @@ class AccountViewset(APIView):
         serializer = CustomUserSerializer(request.user)
         return Response(serializer.data, status.HTTP_200_OK)
 
-
+@extend_schema_view(
+    create=extend_schema(
+        summary='Подтверждение заказа'
+    )
+)
 class ConfirmOrderViewset(ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
@@ -219,20 +239,25 @@ class ConfirmOrderViewset(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         try:
+            """ Из запроса извлекается номер заказа """
             order = Order.objects.get(id=request.data["contact"]["order"])
             if order.status == 'new':
+                """ Если статус заказа - new, то в базу вносятя данные адреса и контактов """
                 request.data["adress"]["order"] = [order.id, ]
                 contact = ContactSerializer(data=request.data["contact"])
                 adress = ArdressSerializer(data=request.data["adress"], many=False)
                 # Проверка наличия в магазинах нужного количествва товара
                 for item in order.items.all():
+                    """ Проверка того, что в магазинах имеются в наличии все товары в заказе """
                     if Availability.objects.get(product_info=item.product, shop=item.shop).quantity < item.quantity:
+                        """ Если какого то товара нет, пользователь получает сообщение об этом """
                         return Response({
                                             'status': f'Товара {item.product.name} нет в достаточном количестве в магазине {item.shop}'},
                                         status=status.HTTP_400_BAD_REQUEST)
                     else:
                         pass
                 if contact.is_valid(raise_exception=True) and adress.is_valid(raise_exception=True):
+                    """ В случае успешного прохожения всех проверок, заказу присваивается статус confirmed """
                     order.status = "confirmed"
                     contact.save()
                     adress.save()
@@ -241,12 +266,20 @@ class ConfirmOrderViewset(ModelViewSet):
                                     status=status.HTTP_201_CREATED)
 
             else:
+                """ Если заказ имеет другой статус, пользователь получает уведомление об ошибке """
                 return Response({"status": "Заказ уже оформлен"}, status=status.HTTP_204_NO_CONTENT)
         except KeyError:
+            """ Если в отправленных данных не хватает необходимых записей, пользоватлеь получает уведомление об ошибке """
             return Response({'status': 'Не хватает данных'}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary='История заказов'
+    )
+)
 class OrderViewSet(ModelViewSet):
+    """ Что-то происходит """
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, IsOwner]
