@@ -57,7 +57,6 @@ class CustomUser(AbstractUser, PermissionsMixin):
         verbose_name_plural = 'Пользователи'
         ordering = ('email', )
 
-    objects = models.Manager
 
 
 #Модель заказа, содержит информацию о дате создания и статусе заказа

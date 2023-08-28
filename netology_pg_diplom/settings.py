@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django_filters',
     'drf_spectacular',
     'social_django',
+    'silk',
 ]
 
 MIDDLEWARE = [
@@ -61,6 +62,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'debug_toolbar.middleware.DebugToolbarMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',
+    'silk.middleware.SilkyMiddleware'
 ]
 
 ROOT_URLCONF = 'netology_pg_diplom.urls'
@@ -195,6 +197,11 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API Сервис заказа товаров для розничных сетей',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': True,
+    "SWAGGER_UI_SETTINGS": {
+            "deepLinking": True,
+            "persistAuthorization": True,
+            "displayOperationId": True,
+        },
     # OTHER SETTINGS
 }
 

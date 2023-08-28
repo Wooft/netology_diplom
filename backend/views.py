@@ -13,29 +13,27 @@ import yaml
 from yaml.loader import SafeLoader
 import re
 from rest_framework.permissions import IsAuthenticated
-from drf_spectacular.utils import extend_schema_view, extend_schema
+from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiResponse, OpenApiExample, OpenApiParameter
 from backend.tasks import yaml_upload_task
-from social_core.backends.vk import VKOAuth2
-
-
-class ShopViewSet(ModelViewSet):
-    queryset = Shop.objects.all()
-    serializer_class = Shopserializer
-
-
-class CategoryViewSet(ModelViewSet):
-    queryset = Category.objects.all()
-    serializer_class = CategorySerializer
 
 
 # Вьюха для работы корзины. На вход принимает запрос с Applicetion/data в формате JSON, содержащий ключи:
 # product - id продукта, добавляемого в корзину
 # shop - id магазина, в котором выбирается продукт
 # quantity - количество единиц добавляемого продукта
+@extend_schema(tags=['Orders', ])
 @extend_schema_view(
     list=extend_schema(
-        summary='Получить содержимое корзины'
-    )
+        summary='Получить содержимое корзины',
+    ),
+    create=extend_schema(
+        summary='Добавление товара в корзину'
+    ),
+    partial_update=extend_schema(
+        summary='Обновление количества товара в корзине'
+    ),
+    destroy=extend_schema(summary='Удаление позиции из корзины'),
+    retrieve=extend_schema(summary='Получение информации по отдельной позиции товара в корзине')
 )
 class BasketViewSet(ModelViewSet):
     queryset = Orderitem.objects.all()
@@ -46,13 +44,14 @@ class BasketViewSet(ModelViewSet):
 
     # Получение информации о текущей корзине
     # Доступна только зарегистрированным пользователям
+    @extend_schema()
     def list(self, request, *args, **kwargs):
-        # Получение заказа со статусом "в корзине". Если в базе данных несколько таких заказов, то получает последний созданный
+        """Получение заказа со статусом "в корзине". Если в базе данных несколько таких заказов, то получает последний созданный.
+        Если заказа со статусом "в корзине" нет в базе данных - выдается статус, что корзина пуста """
         basket = Order.objects.filter(user=request.user, status="basket").order_by("-dt")
-        # Если заказа со статусом "в корзине" нет в базе данных - выдается статус что корзина пуста
         if len(basket) == 0:
             return Response({"status": "shoppingcart is empty"},
-                            status=status.HTTP_200_OK)
+                            status=status.HTTP_204_NO_CONTENT)
         else:
             summ = 0
             delivery_price = 0
@@ -120,7 +119,7 @@ class BasketViewSet(ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
-
+    
     # Функция, которая очищает корзину
     def delete(self, request):
         # Проверка наличия заказа или нескольких заказов, соответсвующих пользователю, со статусом "в корзине"
@@ -138,11 +137,11 @@ class BasketViewSet(ModelViewSet):
             return Response({"status": "Корзина уже пуста"},
                             status=status.HTTP_204_NO_CONTENT)
 
-
+@extend_schema(tags=['Products', ])
 @extend_schema_view(
-    list=extend_schema(
-        summary='Получение списка товаров'
-    )
+    list=extend_schema(summary='Получение списка товаров'),
+    retrieve=extend_schema(summary='Получение карточки товара',
+                           description='Возвращает детальную информацию о товаре, включая список поставщиков и актуальное наличие')
 )
 class ProductInfoViewSet(ModelViewSet):
     queryset = Productinfo.objects.all()
@@ -169,7 +168,7 @@ class ProductInfoViewSet(ModelViewSet):
 
 # Вьюха для загрузки информации из Yaml файла
 @extend_schema_view(
-    list=extend_schema(
+    post=extend_schema(
         summary='Загрузка файла данных от магазина в YAML формате'
     )
 )
@@ -195,7 +194,12 @@ class YamlUploadView(APIView):
                 'status': 'ok'
             })
 
-
+@extend_schema(tags=['Users', ])
+@extend_schema_view(
+    post=extend_schema(
+        summary='Регистрация нового пользователя'
+    )
+)
 class RegisterUser(APIView):
     def post(self, request):
         try:
@@ -218,7 +222,10 @@ class RegisterUser(APIView):
         except KeyError:
             return Response(data={'status': 'input data incorrect'}, status=status.HTTP_400_BAD_REQUEST)
 
-
+@extend_schema(tags=['Users', ])
+@extend_schema_view(
+    get=extend_schema(summary='Личный кабинет, получение основной информации из профиля')
+)
 class AccountViewset(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -226,6 +233,7 @@ class AccountViewset(APIView):
         serializer = CustomUserSerializer(request.user)
         return Response(serializer.data, status.HTTP_200_OK)
 
+@extend_schema(tags=['Orders', ])
 @extend_schema_view(
     create=extend_schema(
         summary='Подтверждение заказа'
@@ -273,20 +281,22 @@ class ConfirmOrderViewset(ModelViewSet):
             return Response({'status': 'Не хватает данных'}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(tags=['Orders', ])
 @extend_schema_view(
-    list=extend_schema(
-        summary='История заказов'
-    )
+    list=extend_schema(summary='История заказов'),
+    retrieve=extend_schema(summary='Детальная информация по заказу'),
+    partial_update=extend_schema(summary='Изменение заказа')
 )
 class OrderViewSet(ModelViewSet):
-    """ Что-то происходит """
+    """ История заказов пользователя """
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, IsOwner]
     http_method_names = ['get', 'patch']
 
-    # Метод list возвращает список заказов пользователя, за исключением заказов со статусом "в корзине"
+
     def list(self, request, *args, **kwargs):
+        """Метод list возвращает список заказов пользователя, за исключением заказов со статусом "в корзине"""
         orders = Order.objects.filter(user=request.user).exclude(status='basket')
         seriazlizer = self.serializer_class(orders, many=True)
         for order in seriazlizer.data:
@@ -298,12 +308,63 @@ class OrderViewSet(ModelViewSet):
             order['summ'] = summ
         return Response(seriazlizer.data, status=status.HTTP_200_OK)
 
+    @extend_schema(request=OrderSerializer,
+                   examples=[
+                       OpenApiExample(
+                           'Принятый заказ',
+                           description='Первый Пример',
+                           value={
+  "id": 1,
+  "dt": "2023-08-24T08:38:18.798903Z",
+  "status": "confirmed",
+  "details": [
+    {
+      "name": "Смартфон Apple iPhone XS Max 512GB (золотистый)",
+      "shop": "Связной",
+      "price": 110000.0,
+      "quantity": 4,
+      "summ": 440000.0
+    }
+  ],
+  "recipient": {
+    "id": 1,
+    "name": "somename",
+    "last_name": "somename",
+    "surname": "",
+    "email": "somemsail@mail.com",
+    "phone": "+79432567483",
+    "order": 1
+  },
+  "adress": {
+    "id": 1,
+    "city": "somecity",
+    "street": "somestreet",
+    "home": "somehome",
+    "structure": "1",
+    "building": "1",
+    "apartment": "1",
+    "is_save": 'false',
+    "order": [
+      1
+    ]
+  }
+},
+                           status_codes=[str(status.HTTP_200_OK)]
+                       ),
+                       OpenApiExample(
+                           'Новый заказ',
+                           description='Принятый заказ',
+                           value={
+                               'id': 3,
+                           }
+                       )
+                   ])
     def retrieve(self, request, *args, **kwargs):
         order = self.get_object()
         if order.status == "basket":
             return Response({'status': 'Заказ еще не оформлен'}, status=status.HTTP_200_OK)
         # Возврат формы - "спасибо за заказ
-        elif order.status == 'confirmed':
+        elif order.status == 'new':
             order = self.get_object()
             # Тут возвращается номер заказа
             # Тут возвращаются детали заказа

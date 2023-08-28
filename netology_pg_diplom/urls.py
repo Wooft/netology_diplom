@@ -20,12 +20,10 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework.authtoken.views import obtain_auth_token
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from backend.views import CategoryViewSet, ShopViewSet, YamlUploadView, ProductInfoViewSet, RegisterUser, \
+from backend.views import YamlUploadView, ProductInfoViewSet, RegisterUser, \
     BasketViewSet, ConfirmOrderViewset, OrderViewSet, AccountViewset
 
 r = DefaultRouter()
-r.register('cat', CategoryViewSet)
-r.register('shop', ShopViewSet)
 r.register('products', ProductInfoViewSet)
 r.register('basket', BasketViewSet)
 r.register("confirm_order", ConfirmOrderViewset)
@@ -42,5 +40,5 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='docs'),
     path('', include('social_django.urls', namespace='social')),
-
+    path('silk/', include('silk.urls', namespace='silk')),
 ] + r.urls

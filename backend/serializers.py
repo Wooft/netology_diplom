@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from backend.models import Shop, Product, Category, Productinfo, CustomUser, Order, Orderitem, Contact, Adress, \
     Parameter, ProductParameter, Availability
-from rest_framework.exceptions import ValidationError
 
 
 class Shopserializer(serializers.ModelSerializer):
@@ -69,8 +68,6 @@ class OrderitemGetSerizlizer(serializers.ModelSerializer):
     class Meta:
         model = Orderitem
         fields = ("id", "order", "product", "shop", "quantity")
-        depth = 1
-
 class BasketSerializer(serializers.ModelSerializer):
     product = ProductInfoSerializer(many=False, read_only=True)
     shop = Shopserializer(many=False, read_only=True)
