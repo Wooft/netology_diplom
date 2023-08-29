@@ -86,7 +86,7 @@ class BasketViewSet(ModelViewSet):
                                                     shop=request.data["shop"])[0]
                 # Проверка того что в указанном магазине находится достаточное количество товара в наличии
                 request.data["quantity"] = int(request.data["quantity"]) + instance.quantity
-                if Availability.objects.get(shop=instance.shop, product_info=instance.product).quantity > request.data['quantity']:
+                if Availability.objects.get(shop=instance.shop, product_info=instance.product).quantity >= request.data['quantity']:
                     # Для создания новых объектов корзины используется OrderItemCreateSerializer, который принимает для создания PK Shop, Product, Order
                     serializer = OrderItemCreateSerializer(instance, data=request.data)
                     serializer.is_valid(raise_exception=True)
@@ -101,7 +101,7 @@ class BasketViewSet(ModelViewSet):
                     serializer.save()
                     return Response(serializer.data, status=status.HTTP_200_OK)
         else:
-            if Availability.objects.get(shop=request.data['shop'], product_info=request.data['product']).quantity > int(
+            if Availability.objects.get(shop=request.data['shop'], product_info=request.data['product']).quantity >= int(
                     request.data['quantity']):
                 request.data['order'] = Order.objects.create(user=request.user, status="basket").id
                 serializer = OrderItemCreateSerializer(data=request.data)
@@ -256,8 +256,9 @@ class ConfirmOrderViewset(ModelViewSet):
                 adress = ArdressSerializer(data=request.data["adress"], many=False)
                 # Проверка наличия в магазинах нужного количествва товара
                 for item in order.items.all():
+                    availability = Availability.objects.get(product_info=item.product, shop=item.shop)
                     """ Проверка того, что в магазинах имеются в наличии все товары в заказе """
-                    if Availability.objects.get(product_info=item.product, shop=item.shop).quantity < item.quantity:
+                    if availability.quantity < item.quantity:
                         """ Если какого то товара нет, пользователь получает сообщение об этом """
                         return Response({
                                             'status': f'Товара {item.product.name} нет в достаточном количестве в магазине {item.shop}'},
@@ -265,7 +266,9 @@ class ConfirmOrderViewset(ModelViewSet):
                     else:
                         pass
                 if contact.is_valid(raise_exception=True) and adress.is_valid(raise_exception=True):
-                    """ В случае успешного прохожения всех проверок, заказу присваивается статус confirmed """
+                    """ В случае успешного прохожения всех проверок, заказу присваивается статус confirmed, товар списывается из наличия """
+                    availability.quantity = availability.quantity - item.quantity
+                    availability.save()
                     order.status = "confirmed"
                     contact.save()
                     adress.save()
