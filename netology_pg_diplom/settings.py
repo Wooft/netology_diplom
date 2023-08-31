@@ -207,9 +207,11 @@ SPECTACULAR_SETTINGS = {
 
 SOCIAL_AUTH_AUTHENTICATION_BACKENDS = [
     'social_core.backends.vk.VKOAuth2',
+    'social_core.backends.google.GoogleOAuth2',
 ]
 
 LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = '/'
 
 SOCIAL_AUTH_JSONFIELD_ENABLED = True
 SOCIAL_AUTH_USER_MODEL = 'backend.CustomUser'

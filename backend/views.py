@@ -112,6 +112,11 @@ class BasketViewSet(ModelViewSet):
                 return Response({'status': 'В данном магазине нет такого количества товара'},
                                 status.HTTP_400_BAD_REQUEST)
 
+    @extend_schema(parameters=OpenApiParameter(
+        name='quantity',
+        type=int,
+        description='Количество товара в корзине'
+    ))
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
@@ -119,6 +124,8 @@ class BasketViewSet(ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+    """Тест"""
     
     # Функция, которая очищает корзину
     def delete(self, request):
