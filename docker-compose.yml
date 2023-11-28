@@ -9,9 +9,8 @@ services:
       sh -c "python manage.py collectstatic --noinput &&
              python manage.py migrate &&
              gunicorn netology_pg_diplom.wsgi:application --bind 0.0.0.0:8000"
-    ports:
-      - 8000:8000
-      - 5678:5678
+    expose:
+      - 8000
     networks:
       - automation
     depends_on:
@@ -24,9 +23,9 @@ services:
     env_file:
       - .env_dev
     environment:
-      - POSTRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=procurement_automation
+      - POSTRES_USER=$DB_USER
+      - POSTGRES_PASSWORD=$DB_PASSWORD
+      - POSTGRES_DB=$DB_NAME
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     networks:
